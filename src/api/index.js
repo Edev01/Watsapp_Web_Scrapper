@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_SCRAPPER_URL || 'https://lsrnm-39-34-138-157.free.pinggy.net';
+const BASE_URL = import.meta.env.VITE_SCRAPPER_URL;
 
 export const API_ENDPOINTS = {
   adminSignup: `${BASE_URL}/api/auth/admin/signup`,
