@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 
-const API_URL = 'https://lkvrp-39-34-138-157.free.pinggy.net/api/qr/latest'
+const API_URL = 'https://lsrnm-39-34-138-157.free.pinggy.net/api/qr/latest'
 
-// WhatsApp QR codes expire in ~20 seconds
-const QR_EXPIRY_SECONDS = 20
+// WhatsApp QR codes expire in ~5 seconds
+const QR_EXPIRY_SECONDS = 5
 
 const STATUS = {
   IDLE: 'idle',
@@ -93,16 +93,30 @@ const QRConnect = () => {
     }
   }, [])
 
-  // Countdown timer when QR is ready
+  // Fetch QR on mount automatically
+  useEffect(() => {
+    fetchQR()
+  }, [fetchQR])
+
+  // Countdown timer when QR is ready — triggers fetchQR when countdown reaches 0
   useEffect(() => {
     if (status !== STATUS.QR_READY) return
     if (countdown <= 0) {
-      setStatus(STATUS.EXPIRED)
+      fetchQR()
       return
     }
     const t = setTimeout(() => setCountdown(c => c - 1), 1000)
     return () => clearTimeout(t)
-  }, [status, countdown])
+  }, [status, countdown, fetchQR])
+
+  // Auto-retry fetch after 5 seconds if expired or on error
+  useEffect(() => {
+    if (status !== STATUS.EXPIRED && status !== STATUS.ERROR) return
+    const t = setTimeout(() => {
+      fetchQR()
+    }, 5000)
+    return () => clearTimeout(t)
+  }, [status, fetchQR])
 
   const formatAge = (createdAt) => {
     if (!createdAt) return ''
@@ -290,7 +304,7 @@ const QRConnect = () => {
                 {status === STATUS.ERROR && 'Error fetching QR'}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-550">Backend: lkvrp-39-34-138-157.free.pinggy.net</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-550">Backend: imuud-39-34-138-157.free.pinggy.net</p>
 
             {/* Debug info */}
             {qrMeta && (

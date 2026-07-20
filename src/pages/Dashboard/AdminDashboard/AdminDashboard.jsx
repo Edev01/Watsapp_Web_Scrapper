@@ -639,7 +639,7 @@ const AdminCreateUserPanel = ({ setToast }) => {
           headers['Authorization'] = `Bearer ${token}`
         }
 
-        const response = await fetch('https://lkvrp-39-34-138-157.free.pinggy.net/api/users', {
+        const response = await fetch('https://lsrnm-39-34-138-157.free.pinggy.net/api/users', {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -934,7 +934,7 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
         }
         if (token) headers['Authorization'] = `Bearer ${token}`
 
-        const res = await fetch('https://lkvrp-39-34-138-157.free.pinggy.net/api/users', { headers })
+        const res = await fetch('https://lsrnm-39-34-138-157.free.pinggy.net/api/users', { headers })
         if (!res.ok) throw new Error(`Server error: ${res.status}`)
         const json = await res.json()
 
