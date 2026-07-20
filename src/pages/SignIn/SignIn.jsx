@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 
 const SignIn = ({ setAuthUser, setToast }) => {
   const navigate = useNavigate()
@@ -44,56 +45,131 @@ const SignIn = ({ setAuthUser, setToast }) => {
 
     setIsLoading(true)
 
-    setTimeout(() => {
-      setIsLoading(false)
+    const callLoginApi = async () => {
+      try {
+        const response = await fetch('https://lkvrp-39-34-138-157.free.pinggy.net/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'bypass-tunnel-reminder': 'true'
+          },
+          body: JSON.stringify({
+            email: signInData.email,
+            password: signInData.password
+          })
+        });
 
-      // 1. Check for Admin Credentials
-      if (signInData.email === 'se.zeeshanhaider@gmail.com' && signInData.password === 'Zhsk99100$') {
-        const adminUser = {
-          fullName: 'Zeeshan Haider',
-          email: 'se.zeeshanhaider@gmail.com',
-          role: 'admin'
+        if (response.ok) {
+          const data = await response.json();
+          const token = data.token || data.accessToken || '';
+          if (token) {
+            localStorage.setItem('authToken', token);
+          }
+
+          const userObj = data.user || data;
+          const email = userObj.email || signInData.email;
+          const role = userObj.role || (email.toLowerCase().includes('admin') ? 'admin' : 'user');
+          const fullName = userObj.fullName || userObj.name || (role === 'admin' ? 'Admin User' : 'Standard User');
+
+          const loggedInUser = {
+            fullName,
+            email,
+            role,
+            token
+          };
+
+          setAuthUser(loggedInUser);
+          setToast({ type: 'success', message: `Welcome back, ${fullName}! 🎉` });
+          navigate('/dashboard');
+          setIsLoading(false);
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          const errMsg = errData.message || errData.error || 'Invalid credentials';
+          throw new Error(errMsg);
         }
-        setAuthUser(adminUser)
-        setToast({ type: 'success', message: 'Welcome back, Admin Zeeshan! 🎉' })
+      } catch (apiError) {
+        console.warn("API login failed, trying mock fallback...", apiError);
+
+        // Fallback for Admin Credentials
+        if (
+          (signInData.email === 'admin@example.com' && signInData.password === 'AdminPassword123') ||
+          (signInData.email === 'se.zeeshanhaider@gmail.com' && signInData.password === 'Zhsk99100$')
+        ) {
+          const adminUser = {
+            fullName: 'Zeeshan Haider',
+            email: signInData.email,
+            role: 'admin'
+          }
+          setAuthUser(adminUser)
+          setToast({ type: 'success', message: 'Welcome back, Admin! (Mock Fallback) 🎉' })
+          navigate('/dashboard')
+          setIsLoading(false)
+          return
+        }
+
+        // Fallback for user creation mock users in localStorage
+        const stored = localStorage.getItem('registeredUsers')
+        const users = stored ? JSON.parse(stored) : []
+        const matchedUser = users.find(u => u.email === signInData.email)
+
+        if (!matchedUser) {
+          setErrors({ email: 'No account found. Please check your credentials.' })
+          setToast({ type: 'error', message: 'No account found. Please check your credentials.' })
+          setIsLoading(false)
+          return
+        }
+
+        if (signInData.password !== matchedUser.password) {
+          setErrors({ password: 'Incorrect password. Please try again.' })
+          setToast({ type: 'error', message: 'Wrong password. Please try again.' })
+          setIsLoading(false)
+          return
+        }
+
+        setAuthUser(matchedUser)
+        setToast({ type: 'success', message: `Welcome back, ${matchedUser.fullName}! (Mock Fallback) 🎉` })
         navigate('/dashboard')
-        return
+        setIsLoading(false)
       }
+    };
 
-      // 2. Read registered users array from localStorage
-      const stored = localStorage.getItem('registeredUsers')
-      const users = stored ? JSON.parse(stored) : []
+    callLoginApi();
+  }
 
-      const matchedUser = users.find(u => u.email === signInData.email)
-
-      if (!matchedUser) {
-        setErrors({ email: 'No account found. Please sign up first.' })
-        setToast({ type: 'error', message: 'No account found. Please sign up first.' })
-        return
+  const formVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+        delayChildren: 0.1
       }
+    }
+  }
 
-      // Compare password
-      if (signInData.password !== matchedUser.password) {
-        setErrors({ password: 'Incorrect password. Please try again.' })
-        setToast({ type: 'error', message: 'Wrong password. Please try again.' })
-        return
-      }
-
-      // ✅ Credentials match — log in
-      setAuthUser(matchedUser)
-      setToast({ type: 'success', message: `Welcome back, ${matchedUser.fullName}! 🎉` })
-      navigate('/dashboard')
-    }, 1200)
+  const itemVariants = {
+    hidden: { y: 15, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { type: 'spring', stiffness: 100, damping: 15 }
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 text-left">
-      <div>
+    <motion.form
+      onSubmit={handleSubmit}
+      variants={formVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 text-left"
+    >
+      <motion.div variants={itemVariants}>
         <h3 className="text-3xl font-black tracking-tight mb-2 text-slate-900">Sign In</h3>
         <p className="text-xs text-slate-500">Enter your credentials to access your account.</p>
-      </div>
+      </motion.div>
 
-      <div className="space-y-5">
+      <motion.div className="space-y-5" variants={itemVariants}>
         {/* Email Input */}
         <div>
           <div className="floating-group">
@@ -181,13 +257,16 @@ const SignIn = ({ setAuthUser, setToast }) => {
             </p>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Submit Button */}
-      <button
+      <motion.button
         type="submit"
         disabled={isLoading}
-        className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold hover:shadow-lg hover:shadow-emerald-500/20 active:scale-[0.99] transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+        variants={itemVariants}
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold hover:shadow-lg hover:shadow-emerald-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
       >
         {isLoading ? (
           <>
@@ -205,8 +284,8 @@ const SignIn = ({ setAuthUser, setToast }) => {
             </svg>
           </>
         )}
-      </button>
-    </form>
+      </motion.button>
+    </motion.form>
   )
 }
 

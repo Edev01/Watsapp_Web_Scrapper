@@ -55,7 +55,7 @@ const applyFilters = (listings, f) => {
 }
 
 const PropertyCard = ({ p, viewMode, isAdmin }) => (
-  <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all duration-200 overflow-hidden group ${
+  <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-700 transition-all duration-200 overflow-hidden group ${
     viewMode === 'list' ? 'flex items-stretch' : 'flex flex-col'
   }`}>
     {/* Purpose Bar */}
@@ -65,41 +65,41 @@ const PropertyCard = ({ p, viewMode, isAdmin }) => (
       <div className={`flex-1 ${viewMode === 'list' ? 'min-w-0' : ''}`}>
         {/* Badges */}
         <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.purpose === 'Buy' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.purpose === 'Buy' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'}`}>
             For {p.purpose}
           </span>
-          {p.verified && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">✓ Verified</span>}
-          {p.featured && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">⭐ Featured</span>}
+          {p.verified && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400">✓ Verified</span>}
+          {p.featured && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400">⭐ Featured</span>}
         </div>
 
-        <h3 className="font-bold text-slate-900 text-sm leading-snug mb-0.5 group-hover:text-emerald-700 transition-colors">{p.title}</h3>
-        <p className="text-xs text-slate-500 mb-2">📍 {p.location}, {p.city}</p>
+        <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug mb-0.5 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">{p.title}</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">📍 {p.location}, {p.city}</p>
 
         {/* Price */}
-        <p className="text-base font-extrabold text-emerald-600 mb-2">{formatPrice(p.price, p.purpose)}</p>
+        <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mb-2">{formatPrice(p.price, p.purpose)}</p>
 
         {/* Tags */}
         <div className="flex flex-wrap gap-1.5 mb-2">
-          <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">{p.type}</span>
-          <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">{p.area} {p.areaUnit}</span>
-          {p.bedrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">🛏 {p.bedrooms}</span>}
-          {p.bathrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">🚿 {p.bathrooms}</span>}
-          {p.furnished !== 'All' && <span className="text-[10px] font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md">{p.furnished}</span>}
-          {p.possession !== 'Ready' && <span className="text-[10px] font-semibold px-2 py-0.5 bg-rose-50 text-rose-600 rounded-md">{p.possession}</span>}
+          <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.type}</span>
+          <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.area} {p.areaUnit}</span>
+          {p.bedrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">🛏 {p.bedrooms}</span>}
+          {p.bathrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">🚿 {p.bathrooms}</span>}
+          {p.furnished !== 'All' && <span className="text-[10px] font-semibold px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 dark:text-indigo-400 rounded-md">{p.furnished}</span>}
+          {p.possession !== 'Ready' && <span className="text-[10px] font-semibold px-2 py-0.5 bg-rose-50 dark:bg-rose-950/40 text-rose-650 dark:text-rose-400 rounded-md">{p.possession}</span>}
         </div>
 
-        {viewMode === 'grid' && <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-3">{p.description}</p>}
+        {viewMode === 'grid' && <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mb-3">{p.description}</p>}
       </div>
 
       {/* Footer */}
-      <div className={`flex items-center justify-between pt-3 border-t border-slate-100 mt-auto ${viewMode === 'list' ? 'sm:border-t-0 sm:border-l sm:pl-6 sm:flex-col sm:items-end sm:gap-2 sm:w-48 sm:shrink-0' : ''}`}>
+      <div className={`flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-750 mt-auto ${viewMode === 'list' ? 'sm:border-t-0 sm:border-l sm:pl-6 sm:flex-col sm:items-end sm:gap-2 sm:w-48 sm:shrink-0 dark:sm:border-l-slate-700' : ''}`}>
         <div>
-          <p className="text-[10px] text-slate-500 font-medium">📱 {p.phone}</p>
-          {isAdmin && <p className="text-[10px] text-slate-400 mt-0.5">{p.scrapedFrom}</p>}
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">📱 {p.phone}</p>
+          {isAdmin && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{p.scrapedFrom}</p>}
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-slate-400">{formatDate(p.scrapedAt)}</p>
-          <button className="mt-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-500 cursor-pointer">
+          <p className="text-[10px] text-slate-400 dark:text-slate-550">{formatDate(p.scrapedAt)}</p>
+          <button className="mt-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 cursor-pointer">
             Save ♡
           </button>
         </div>
@@ -120,23 +120,23 @@ const PropertyListings = ({ isAdmin = false }) => {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto transition-colors">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
             {isAdmin ? 'All Property Listings' : 'Search Properties'}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             {isAdmin ? 'Scraped from WhatsApp groups · ' : 'Pakistan real estate · '}
-            <span className="font-bold text-slate-700">{filtered.length}</span> results
+            <span className="font-bold text-slate-700 dark:text-slate-300">{filtered.length}</span> results
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg border cursor-pointer transition-colors ${viewMode === 'grid' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-400 border-slate-200'}`}>
+          <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg border cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-450 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500'}`}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
           </button>
-          <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg border cursor-pointer transition-colors ${viewMode === 'list' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-400 border-slate-200'}`}>
+          <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg border cursor-pointer transition-all ${viewMode === 'list' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-450 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500'}`}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
           </button>
         </div>
@@ -147,12 +147,12 @@ const PropertyListings = ({ isAdmin = false }) => {
 
       {/* Results */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16 text-slate-400">
+        <div className="text-center py-16 text-slate-400 dark:text-slate-500 transition-colors">
           <svg className="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
-          <p className="font-semibold text-sm">No properties match your filters</p>
-          <p className="text-xs mt-1">Try adjusting or clearing your filters</p>
+          <p className="font-semibold text-sm text-slate-600 dark:text-slate-350">No properties match your filters</p>
+          <p className="text-xs mt-1 text-slate-400 dark:text-slate-500">Try adjusting or clearing your filters</p>
         </div>
       ) : (
         <div className={

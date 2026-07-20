@@ -59,35 +59,35 @@ const formatPrice = (price, purpose) => {
 const formatDate = iso => new Date(iso).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 const PropertyCard = ({ p, viewMode }) => (
-  <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all duration-200 overflow-hidden group ${
+  <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-700 transition-all duration-200 overflow-hidden group ${
     viewMode === 'list' ? 'flex items-stretch' : 'flex flex-col'
   }`}>
     <div className={`${viewMode === 'grid' ? 'h-1.5 w-full' : 'w-1.5 shrink-0'} ${p.purpose === 'Buy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
     <div className="p-4 flex flex-col flex-1">
       <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.purpose === 'Buy' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>For {p.purpose}</span>
-        {p.verified && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">✓ Verified</span>}
-        {p.featured && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">⭐ Featured</span>}
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.purpose === 'Buy' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'}`}>For {p.purpose}</span>
+        {p.verified && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400">✓ Verified</span>}
+        {p.featured && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400">⭐ Featured</span>}
       </div>
-      <h3 className="font-bold text-slate-900 text-sm leading-snug mb-0.5 group-hover:text-emerald-700 transition-colors">{p.title}</h3>
-      <p className="text-xs text-slate-500 mb-2">📍 {p.location}, {p.city}</p>
-      <p className="text-base font-extrabold text-emerald-600 mb-2">{formatPrice(p.price, p.purpose)}</p>
+      <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug mb-0.5 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">{p.title}</h3>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">📍 {p.location}, {p.city}</p>
+      <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mb-2">{formatPrice(p.price, p.purpose)}</p>
       <div className="flex flex-wrap gap-1.5 mb-2">
-        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">{p.type}</span>
-        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">{p.area} {p.areaUnit}</span>
-        {p.bedrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">🛏 {p.bedrooms}</span>}
-        {p.bathrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">🚿 {p.bathrooms}</span>}
-        {p.furnished !== 'All' && p.furnished !== 'Unfurnished' && <span className="text-[10px] font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md">{p.furnished}</span>}
+        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.type}</span>
+        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.area} {p.areaUnit}</span>
+        {p.bedrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">🛏 {p.bedrooms}</span>}
+        {p.bathrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">🚿 {p.bathrooms}</span>}
+        {p.furnished !== 'All' && p.furnished !== 'Unfurnished' && <span className="text-[10px] font-semibold px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 dark:text-indigo-400 rounded-md">{p.furnished}</span>}
       </div>
-      <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-3">{p.description}</p>
-      <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-auto">
+      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mb-3">{p.description}</p>
+      <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-750 mt-auto">
         <div>
-          <p className="text-[10px] text-slate-500 font-medium">📱 {p.phone}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">{p.scrapedFrom}</p>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">📱 {p.phone}</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{p.scrapedFrom}</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-slate-400">{formatDate(p.scrapedAt)}</p>
-          <button className="mt-1 text-[10px] font-bold text-rose-400 hover:text-rose-500 cursor-pointer">♡ Save</button>
+          <p className="text-[10px] text-slate-400 dark:text-slate-550">{formatDate(p.scrapedAt)}</p>
+          <button className="mt-1 text-[10px] font-bold text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 cursor-pointer">♡ Save</button>
         </div>
       </div>
     </div>
@@ -122,15 +122,15 @@ const Results = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 transition-colors">
       {/* Top Bar */}
-      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
+      <header className="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors shrink-0"
+            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-750 cursor-pointer transition-colors shrink-0"
           >
-            <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-5 h-5 text-slate-600 dark:text-slate-350" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
@@ -140,10 +140,10 @@ const Results = () => {
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
               </svg>
             </div>
-            <span className="font-extrabold text-slate-900 text-sm">WhatsScrape</span>
+            <span className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">WhatsScrape</span>
           </div>
-          <div className="h-5 w-px bg-slate-200" />
-          <h1 className="text-sm font-bold text-slate-700 truncate">
+          <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
+          <h1 className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">
             Search Results
             {committed.city !== 'All Cities' && ` · ${committed.city}`}
             {committed.location && ` · ${committed.location}`}
@@ -153,38 +153,38 @@ const Results = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Active Filters Summary Bar */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 shadow-sm mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-colors">
           <div className="flex-1">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">Active Search Filters</p>
+            <p className="text-[11px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wide mb-1">Active Search Filters</p>
             <div className="flex flex-wrap gap-1.5 items-center">
-              <span className="text-xs font-bold px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100">
+              <span className="text-xs font-bold px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
                 For {committed.purpose}
               </span>
-              <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg">
+              <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-600">
                 📍 {committed.city}
               </span>
               {committed.location && (
-                <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">
+                <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 rounded-lg border border-blue-100 dark:border-blue-900/50">
                   🔍 "{committed.location}"
                 </span>
               )}
               {committed.propertyType !== 'All' && (
-                <span className="text-xs font-bold px-2.5 py-1 bg-purple-50 text-purple-700 rounded-lg border border-purple-100">
+                <span className="text-xs font-bold px-2.5 py-1 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 rounded-lg border border-purple-100 dark:border-purple-900/50">
                   🏠 {committed.propertyType} {committed.propertySubType ? `(${committed.propertySubType})` : ''}
                 </span>
               )}
               {(committed.priceMin || committed.priceMax) && (
-                <span className="text-xs font-bold px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg border border-amber-100">
+                <span className="text-xs font-bold px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 rounded-lg border border-amber-100 dark:border-amber-900/50">
                   💰 {committed.priceMin ? `${committed.priceMin} ${committed.currency}` : '0'} to {committed.priceMax ? `${committed.priceMax} ${committed.currency}` : 'Max'}
                 </span>
               )}
               {committed.bedrooms !== 'Any' && (
-                <span className="text-xs font-bold px-2.5 py-1 bg-rose-50 text-rose-700 rounded-lg border border-rose-100">
+                <span className="text-xs font-bold px-2.5 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 rounded-lg border border-rose-100 dark:border-rose-900/50">
                   🛏 {committed.bedrooms} Beds
                 </span>
               )}
               {committed.verified && (
-                <span className="text-xs font-bold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">
+                <span className="text-xs font-bold px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 rounded-lg border border-indigo-100 dark:border-indigo-900/50">
                   ✓ Verified Only
                 </span>
               )}
@@ -193,7 +193,7 @@ const Results = () => {
 
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 transition-colors cursor-pointer self-start md:self-auto"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 dark:bg-slate-750 text-white rounded-xl font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-650 transition-colors cursor-pointer self-start md:self-auto"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -204,16 +204,16 @@ const Results = () => {
 
         {/* Results Header */}
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-slate-600">
-            Showing <span className="font-bold text-slate-900">{results.length}</span> properties
-            {committed.city !== 'All Cities' && <span className="text-slate-500"> in {committed.city}</span>}
-            {committed.location && <span className="text-slate-500"> near "{committed.location}"</span>}
+          <p className="text-sm text-slate-600 dark:text-slate-350">
+            Showing <span className="font-bold text-slate-900 dark:text-slate-100">{results.length}</span> properties
+            {committed.city !== 'All Cities' && <span className="text-slate-500 dark:text-slate-400"> in {committed.city}</span>}
+            {committed.location && <span className="text-slate-500 dark:text-slate-400"> near "{committed.location}"</span>}
           </p>
           <div className="flex items-center gap-2">
-            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg border cursor-pointer transition-colors ${viewMode === 'grid' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-400 border-slate-200'}`}>
+            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg border cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-450 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500'}`}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
             </button>
-            <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg border cursor-pointer transition-colors ${viewMode === 'list' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-400 border-slate-200'}`}>
+            <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg border cursor-pointer transition-all ${viewMode === 'list' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-450 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500'}`}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
             </button>
           </div>
@@ -227,12 +227,12 @@ const Results = () => {
             ))}
           </div>
         ) : results.length === 0 ? (
-          <div className="text-center py-20">
-            <svg className="w-14 h-14 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className="text-center py-20 transition-colors">
+            <svg className="w-14 h-14 mx-auto text-slate-300 dark:text-slate-650 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <p className="font-bold text-slate-600 text-base">No properties found</p>
-            <p className="text-sm text-slate-400 mt-1">Try adjusting your filters and search again</p>
+            <p className="font-bold text-slate-600 dark:text-slate-350 text-base">No properties found</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Try adjusting your filters and search again</p>
           </div>
         ) : (
           <div className={

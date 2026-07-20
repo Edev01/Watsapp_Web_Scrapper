@@ -2,23 +2,34 @@ import { useState, useEffect, useRef } from 'react'
 import Sidebar from '../../../components/Sidebar/Sidebar'
 import QRConnect from '../../../components/QRConnect/QRConnect'
 import PropertyListings from '../../../components/PropertyListings/PropertyListings'
+import Header from '../../../components/Header/Header'
+import SkeletonLoading from '../../../components/SkeletonLoading/SkeletonLoading'
 
 // Admin nav items
 const ADMIN_NAV = [
   { id: 'overview', label: 'Overview', icon: 'grid' },
-  { id: 'connect', label: 'WhatsApp Connect', icon: 'qr' },
   { id: 'listings', label: 'All Listings', icon: 'home' },
   { id: 'users', label: 'Users', icon: 'users' },
   { id: 'createUser', label: 'Create User', icon: 'userPlus' },
 ]
 
-const StatCard = ({ label, value, sub, color }) => (
-  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
-    <p className={`text-2xl font-extrabold ${color || 'text-slate-900'}`}>{value}</p>
-    {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
-  </div>
-)
+const StatCard = ({ label, value, sub, color }) => {
+  const colorMap = {
+    'text-emerald-600': 'text-emerald-600 dark:text-emerald-400',
+    'text-blue-600': 'text-blue-600 dark:text-blue-400',
+    'text-purple-600': 'text-purple-600 dark:text-purple-400',
+    'text-amber-600': 'text-amber-600 dark:text-amber-400',
+  }
+  const displayColor = colorMap[color] || color || 'text-slate-900 dark:text-slate-100'
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-colors">
+      <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className={`text-2xl font-extrabold ${displayColor}`}>{value}</p>
+      {sub && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{sub}</p>}
+    </div>
+  )
+}
 
 const getRelativeTime = (isoString) => {
   if (!isoString) return 'N/A'
@@ -116,7 +127,7 @@ const getGraphData = (users, timeframe) => {
   return data
 }
 
-const UsersOnboardingChart = ({ users = [] }) => {
+const UsersOnboardingChart = ({ users = [], theme }) => {
   const [timeframe, setTimeframe] = useState('week')
   const [hoveredIdx, setHoveredIdx] = useState(null)
   const [width, setWidth] = useState(500)
@@ -167,23 +178,23 @@ const UsersOnboardingChart = ({ users = [] }) => {
     : ''
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-colors">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-extrabold text-slate-900 text-sm">Users Onboarding</h3>
-          <p className="text-[10px] text-slate-400 mt-0.5">Registration trends over time</p>
+          <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Users Onboarding</h3>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Registration trends over time</p>
         </div>
         <div className="relative">
           <select
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-100 rounded-xl outline-none cursor-pointer transition-colors"
+            className="appearance-none pl-3 pr-8 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-900/50 rounded-xl outline-none cursor-pointer transition-colors"
           >
-            <option value="week">Last Week</option>
-            <option value="month">Last Month</option>
-            <option value="sixMonths">Last 6 Months</option>
+            <option value="week" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Last Week</option>
+            <option value="month" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Last Month</option>
+            <option value="sixMonths" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Last 6 Months</option>
           </select>
-          <span className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-emerald-600">
+          <span className="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-emerald-600 dark:text-emerald-400">
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
@@ -211,7 +222,7 @@ const UsersOnboardingChart = ({ users = [] }) => {
                   y1={y}
                   x2={width - paddingRight}
                   y2={y}
-                  stroke="#e2e8f0"
+                  stroke={theme === 'dark' ? '#334155' : '#e2e8f0'}
                   strokeWidth={1}
                   strokeDasharray="4 4"
                 />
@@ -260,7 +271,7 @@ const UsersOnboardingChart = ({ users = [] }) => {
                 cx={points[hoveredIdx].x}
                 cy={points[hoveredIdx].y}
                 r={4.5}
-                fill="#ffffff"
+                fill={theme === 'dark' ? '#1e293b' : '#ffffff'}
                 stroke="#10b981"
                 strokeWidth={2.5}
               />
@@ -293,7 +304,7 @@ const UsersOnboardingChart = ({ users = [] }) => {
               x={p.x}
               y={height - 8}
               textAnchor="middle"
-              className="text-[9px] fill-slate-400 font-bold"
+              className="text-[9px] fill-slate-400 dark:fill-slate-500 font-bold"
             >
               {p.label}
             </text>
@@ -319,7 +330,7 @@ const UsersOnboardingChart = ({ users = [] }) => {
   )
 }
 
-const AdminOverview = ({ users = [] }) => {
+const AdminOverview = ({ users = [], theme }) => {
   const totalUsers = users.length
   const recentUsers = [...users]
     .sort((a, b) => new Date(b.joinedAt) - new Date(a.joinedAt))
@@ -328,8 +339,8 @@ const AdminOverview = ({ users = [] }) => {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-black text-slate-900">Admin Overview</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Platform statistics and management</p>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Admin Overview</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Platform statistics and management</p>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total Listings" value="1,284" sub="+48 today" color="text-emerald-600" />
@@ -340,13 +351,13 @@ const AdminOverview = ({ users = [] }) => {
 
       {/* Users Onboarding Chart */}
       <div className="mb-6">
-        <UsersOnboardingChart users={users} />
+        <UsersOnboardingChart users={users} theme={theme} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent Activity */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <h3 className="font-bold text-slate-900 mb-4 text-sm">Recent Scrape Activity</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-colors">
+          <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-4 text-sm">Recent Scrape Activity</h3>
           <div className="space-y-3">
             {[
               { group: 'Scheme 33 Properties', count: 48, time: '5 min ago', status: 'success' },
@@ -354,13 +365,15 @@ const AdminOverview = ({ users = [] }) => {
               { group: 'DHA Karachi Deals', count: 34, time: '1 hr ago', status: 'success' },
               { group: 'Gulshan Property Hub', count: 71, time: '2 hr ago', status: 'warning' },
             ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+              <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
                 <div>
-                  <p className="text-xs font-semibold text-slate-800">{item.group}</p>
-                  <p className="text-[10px] text-slate-400">{item.count} listings · {item.time}</p>
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{item.group}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">{item.count} listings · {item.time}</p>
                 </div>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  item.status === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                  item.status === 'success' 
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' 
+                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
                 }`}>
                   {item.status === 'success' ? 'OK' : 'Slow'}
                 </span>
@@ -369,8 +382,8 @@ const AdminOverview = ({ users = [] }) => {
           </div>
         </div>
         {/* Recent Users */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <h3 className="font-bold text-slate-900 mb-4 text-sm">Recent Users</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-colors">
+          <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-4 text-sm">Recent Users</h3>
           <div className="space-y-3">
             {recentUsers.length === 0 ? (
               <div className="text-center py-8 text-slate-400">
@@ -378,15 +391,15 @@ const AdminOverview = ({ users = [] }) => {
               </div>
             ) : (
               recentUsers.map((u, i) => (
-                <div key={i} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
-                  <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center shrink-0">
+                <div key={i} className="flex items-center gap-3 py-2 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
+                  <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center justify-center shrink-0">
                     {u.fullName?.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 truncate">{u.fullName}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{u.email}</p>
+                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{u.fullName}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{u.email}</p>
                   </div>
-                  <p className="text-[10px] text-slate-400 shrink-0">{getRelativeTime(u.joinedAt)}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">{getRelativeTime(u.joinedAt)}</p>
                 </div>
               ))
             )}
@@ -396,14 +409,25 @@ const AdminOverview = ({ users = [] }) => {
     </div>
   )
 }
-
-const AdminUsersPanel = ({ users = [] }) => {
+const AdminUsersPanel = ({ users = [], setActiveTab }) => {
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const filteredUsers = users.filter(u => 
     u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  // Reset to first page when search query changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = Math.min(startIndex + itemsPerPage, filteredUsers.length)
+  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage)
 
   const formatJoinDate = (iso) => {
     if (!iso) return 'N/A'
@@ -415,17 +439,20 @@ const AdminUsersPanel = ({ users = [] }) => {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900">Users Management</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Total Registered Users: <span className="font-bold text-slate-800">{users.length}</span>
-          </p>
-        </div>
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto transition-colors space-y-6">
+      {/* Page Title Block */}
+      <div>
+        <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">Users Management</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          Total Registered Users: <span className="font-bold text-slate-800 dark:text-slate-200">{users.length}</span>
+        </p>
+      </div>
+
+      {/* Action Row - Search left, Add button on the far right */}
+      <div className="flex flex-row items-center justify-between gap-3 w-full">
         <div className="relative w-full sm:w-72">
           <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </span>
@@ -434,54 +461,118 @@ const AdminUsersPanel = ({ users = [] }) => {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search users by name/email..."
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent text-slate-800 placeholder-slate-400"
+            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none transition-all"
           />
         </div>
+        <button
+          type="button"
+          onClick={() => setActiveTab('createUser')}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white text-xs font-bold transition-all shadow-md shadow-emerald-500/10 shrink-0 cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Add User
+        </button>
       </div>
 
       {filteredUsers.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 shadow-sm">
-          <svg className="w-10 h-10 mx-auto text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-12 text-center text-slate-400 dark:text-slate-500 shadow-sm transition-colors">
+          <svg className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
-          <p className="font-semibold text-sm">No registered users found</p>
-          <p className="text-xs mt-1">Users will appear here once they sign up.</p>
+          <p className="font-semibold text-sm text-slate-600 dark:text-slate-300">No registered users found</p>
+          <p className="text-xs mt-1 text-slate-400 dark:text-slate-500">Users will appear here once they sign up.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">User</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email Address</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Joined Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredUsers.map((u, i) => (
-                  <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-700 text-xs font-bold flex items-center justify-center">
-                          {u.fullName.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-xs font-bold text-slate-800">{u.fullName}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-600 font-mono">{u.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                        {u.role || 'user'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-400">{formatJoinDate(u.joinedAt)}</td>
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-700/40 border-b border-slate-200 dark:border-slate-700">
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">User</th>
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email Address</th>
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Role</th>
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Joined Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
+                  {paginatedUsers.map((u, i) => (
+                    <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center justify-center">
+                            {u.fullName.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{u.fullName}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300 font-mono">{u.email}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                          u.role === 'admin'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50'
+                            : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-900/50'
+                        }`}>
+                          {u.role || 'user'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-400 dark:text-slate-500">{formatJoinDate(u.joinedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-1 py-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Showing <span className="font-bold text-slate-800 dark:text-slate-200">{startIndex + 1}</span> to{' '}
+                <span className="font-bold text-slate-800 dark:text-slate-200">{endIndex}</span> of{' '}
+                <span className="font-bold text-slate-800 dark:text-slate-200">{filteredUsers.length}</span> users
+              </p>
+              <div className="flex items-center gap-1.5">
+                {/* Prev Button */}
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Previous
+                </button>
+
+                {/* Page Numbers */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+                      currentPage === page
+                        ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/10'
+                        : 'border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                {/* Next Button */}
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -537,63 +628,117 @@ const AdminCreateUserPanel = ({ setToast }) => {
 
     setIsLoading(true)
 
-    setTimeout(() => {
-      // Read existing users
-      const stored = localStorage.getItem('registeredUsers')
-      const users = stored ? JSON.parse(stored) : []
-
-      // Check if email already exists
-      const emailExists = users.some(u => u.email.toLowerCase() === formData.email.toLowerCase())
-      const isAdminEmail = formData.email.toLowerCase() === 'se.zeeshanhaider@gmail.com'
-
-      if (emailExists || isAdminEmail) {
-        setIsLoading(false)
-        setErrors({ email: 'A user with this email already exists' })
-        if (setToast) {
-          setToast({ type: 'error', message: 'Email address already registered' })
+    const callCreateUserApi = async () => {
+      try {
+        const token = localStorage.getItem('authToken')
+        const headers = {
+          'Content-Type': 'application/json',
+          'bypass-tunnel-reminder': 'true'
         }
-        return
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+
+        const response = await fetch('https://lkvrp-39-34-138-157.free.pinggy.net/api/users', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Sync with local storage user list
+          const stored = localStorage.getItem('registeredUsers')
+          const users = stored ? JSON.parse(stored) : []
+          
+          const newUser = {
+            fullName: formData.fullName || data.fullName || 'New User',
+            email: formData.email,
+            password: formData.password,
+            role: formData.role,
+            joinedAt: new Date().toISOString()
+          }
+
+          users.push(newUser)
+          localStorage.setItem('registeredUsers', JSON.stringify(users))
+
+          setIsLoading(false)
+          if (setToast) {
+            setToast({ type: 'success', message: `User ${formData.fullName || formData.email} created successfully on server! 🎉` })
+          }
+
+          setFormData({
+            fullName: '',
+            email: '',
+            password: '',
+            role: 'user'
+          })
+        } else {
+          const errData = await response.json().catch(() => ({}))
+          const errMsg = errData.message || errData.error || 'Failed to create user on server'
+          throw new Error(errMsg)
+        }
+      } catch (apiError) {
+        console.warn("API create user failed, trying mock fallback...", apiError)
+
+        const stored = localStorage.getItem('registeredUsers')
+        const users = stored ? JSON.parse(stored) : []
+
+        const emailExists = users.some(u => u.email.toLowerCase() === formData.email.toLowerCase())
+        const isAdminEmail = formData.email.toLowerCase() === 'se.zeeshanhaider@gmail.com'
+
+        if (emailExists || isAdminEmail) {
+          setIsLoading(false)
+          setErrors({ email: 'A user with this email already exists' })
+          if (setToast) {
+            setToast({ type: 'error', message: 'Email address already registered' })
+          }
+          return
+        }
+
+        const newUser = {
+          fullName: formData.fullName || 'Mock User',
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+          joinedAt: new Date().toISOString()
+        }
+
+        users.push(newUser)
+        localStorage.setItem('registeredUsers', JSON.stringify(users))
+
+        setIsLoading(false)
+        if (setToast) {
+          setToast({ type: 'success', message: `User ${formData.fullName} created successfully! (Mock Fallback) 🎉` })
+        }
+
+        setFormData({
+          fullName: '',
+          email: '',
+          password: '',
+          role: 'user'
+        })
       }
+    };
 
-      // Add new user
-      const newUser = {
-        fullName: formData.fullName,
-        email: formData.email,
-        password: formData.password,
-        role: formData.role,
-        joinedAt: new Date().toISOString()
-      }
-
-      users.push(newUser)
-      localStorage.setItem('registeredUsers', JSON.stringify(users))
-
-      setIsLoading(false)
-      if (setToast) {
-        setToast({ type: 'success', message: `User ${formData.fullName} created successfully! 🎉` })
-      }
-
-      // Reset form
-      setFormData({
-        fullName: '',
-        email: '',
-        password: '',
-        role: 'user'
-      })
-    }, 1000)
+    callCreateUserApi();
   }
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
+    <div className="p-6 max-w-xl mx-auto transition-colors">
       <div className="mb-6">
-        <h1 className="text-2xl font-black text-slate-900">Create User</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Register a new user or administrator on the platform</p>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Create User</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Register a new user or administrator on the platform</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 shadow-sm transition-colors">
         <form onSubmit={handleSubmit} className="space-y-5 text-left">
           {/* Full Name */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Full Name</label>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Full Name</label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -605,8 +750,8 @@ const AdminCreateUserPanel = ({ setToast }) => {
                 name="fullName"
                 value={formData.fullName}
                 onChange={handleChange}
-                className={`w-full pl-11 pr-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 bg-white ${
-                  errors.fullName ? 'border-rose-500 ring-rose-500/20' : 'border-slate-200'
+                className={`w-full pl-11 pr-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
+                  errors.fullName ? 'border-rose-500 ring-rose-500/20' : 'border-slate-200 dark:border-slate-600'
                 }`}
                 placeholder="Enter full name"
               />
@@ -623,7 +768,7 @@ const AdminCreateUserPanel = ({ setToast }) => {
 
           {/* Email Address */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -635,8 +780,8 @@ const AdminCreateUserPanel = ({ setToast }) => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className={`w-full pl-11 pr-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 bg-white ${
-                  errors.email ? 'border-rose-500 ring-rose-500/20' : 'border-slate-200'
+                className={`w-full pl-11 pr-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
+                  errors.email ? 'border-rose-500 ring-rose-500/20' : 'border-slate-200 dark:border-slate-600'
                 }`}
                 placeholder="Enter email address"
               />
@@ -653,7 +798,7 @@ const AdminCreateUserPanel = ({ setToast }) => {
 
           {/* Password */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Password</label>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Password</label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -665,15 +810,15 @@ const AdminCreateUserPanel = ({ setToast }) => {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className={`w-full pl-11 pr-11 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 bg-white ${
-                  errors.password ? 'border-rose-500 ring-rose-500/20' : 'border-slate-200'
+                className={`w-full pl-11 pr-11 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
+                  errors.password ? 'border-rose-500 ring-rose-500/20' : 'border-slate-200 dark:border-slate-600'
                 }`}
                 placeholder="Enter password (min 6 chars)"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
               >
                 {showPassword ? (
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -699,13 +844,13 @@ const AdminCreateUserPanel = ({ setToast }) => {
 
           {/* User Role */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">User Role</label>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5">User Role</label>
             <div className="grid grid-cols-2 gap-3">
               {/* User Option */}
               <label className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
                 formData.role === 'user' 
-                  ? 'border-emerald-500 bg-emerald-50/30 ring-1 ring-emerald-500' 
-                  : 'border-slate-200 bg-white hover:bg-slate-50'
+                  ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 ring-1 ring-emerald-500' 
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50'
               }`}>
                 <input
                   type="radio"
@@ -716,16 +861,16 @@ const AdminCreateUserPanel = ({ setToast }) => {
                   className="w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 focus:ring-2"
                 />
                 <div>
-                  <p className="text-xs font-bold text-slate-900">Standard User</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Access user dashboard & scrape data</p>
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Standard User</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Access user dashboard & scrape data</p>
                 </div>
               </label>
 
               {/* Admin Option */}
               <label className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
                 formData.role === 'admin' 
-                  ? 'border-emerald-500 bg-emerald-50/30 ring-1 ring-emerald-500' 
-                  : 'border-slate-200 bg-white hover:bg-slate-50'
+                  ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 ring-1 ring-emerald-500' 
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50'
               }`}>
                 <input
                   type="radio"
@@ -736,8 +881,8 @@ const AdminCreateUserPanel = ({ setToast }) => {
                   className="w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 focus:ring-2"
                 />
                 <div>
-                  <p className="text-xs font-bold text-slate-900">Administrator</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Full access to manage users & platform</p>
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Administrator</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Full access to manage users & platform</p>
                 </div>
               </label>
             </div>
@@ -752,7 +897,7 @@ const AdminCreateUserPanel = ({ setToast }) => {
             {isLoading ? (
               <>
                 <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
                 Creating User...
@@ -772,98 +917,66 @@ const AdminCreateUserPanel = ({ setToast }) => {
   )
 }
 
-const AdminDashboard = ({ user, onSignOut, setToast }) => {
+const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   const [activeTab, setActiveTab] = useState('overview')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [users, setUsers] = useState([])
+  const [tabLoading, setTabLoading] = useState(true)
 
+  // Fetch users from API (with localStorage fallback)
   useEffect(() => {
-    // Seed mock users if empty
-    const stored = localStorage.getItem('registeredUsers')
-    let usersList = stored ? JSON.parse(stored) : []
-
-    if (usersList.length === 0) {
-      const now = new Date()
-      usersList = [
-        {
-          fullName: 'Ahmed Khan',
-          email: 'ahmed@example.com',
-          password: 'password123',
-          role: 'user',
-          joinedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString() // 2 hr ago
-        },
-        {
-          fullName: 'Sara Ali',
-          email: 'sara@example.com',
-          password: 'password123',
-          role: 'user',
-          joinedAt: new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString() // 5 hr ago
-        },
-        {
-          fullName: 'Bilal Siddiqui',
-          email: 'bilal@example.com',
-          password: 'password123',
-          role: 'user',
-          joinedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString() // 1 day ago
-        },
-        {
-          fullName: 'Nadia Rehman',
-          email: 'nadia@example.com',
-          password: 'password123',
-          role: 'user',
-          joinedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString() // 2 days ago
-        },
-        {
-          fullName: 'Kamran Akmal',
-          email: 'kamran@example.com',
-          password: 'password123',
-          role: 'user',
-          joinedAt: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString() // 6 days ago
-        },
-        {
-          fullName: 'Zainab Bibi',
-          email: 'zainab@example.com',
-          password: 'password123',
-          role: 'user',
-          joinedAt: new Date(now.getTime() - 12 * 24 * 60 * 60 * 1000).toISOString() // 12 days ago
-        },
-        {
-          fullName: 'Faisal Iqbal',
-          email: 'faisal@example.com',
-          password: 'password123',
-          role: 'user',
-          joinedAt: new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000).toISOString() // 20 days ago
-        },
-        {
-          fullName: 'Yasir Shah',
-          email: 'yasir@example.com',
-          password: 'password123',
-          role: 'user',
-          joinedAt: new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000).toISOString() // 1.5 months ago
-        },
-        {
-          fullName: 'Sana Mir',
-          email: 'sana@example.com',
-          password: 'password123',
-          role: 'user',
-          joinedAt: new Date(now.getTime() - 95 * 24 * 60 * 60 * 1000).toISOString() // ~3 months ago
-        },
-        {
-          fullName: 'Babar Azam',
-          email: 'babar@example.com',
-          password: 'password123',
-          role: 'admin',
-          joinedAt: new Date(now.getTime() - 150 * 24 * 60 * 60 * 1000).toISOString() // ~5 months ago
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem('authToken')
+        const headers = {
+          'Content-Type': 'application/json',
+          'bypass-tunnel-reminder': 'true'
         }
-      ]
-      localStorage.setItem('registeredUsers', JSON.stringify(usersList))
+        if (token) headers['Authorization'] = `Bearer ${token}`
+
+        const res = await fetch('https://lkvrp-39-34-138-157.free.pinggy.net/api/users', { headers })
+        if (!res.ok) throw new Error(`Server error: ${res.status}`)
+        const json = await res.json()
+
+        // Normalize: API may return array or { users: [] } or { data: [] }
+        const list = Array.isArray(json) ? json
+          : Array.isArray(json.users) ? json.users
+          : Array.isArray(json.data) ? json.data
+          : []
+
+        // Normalize fields to our local shape
+        const normalized = list.map(u => ({
+          fullName: u.fullName || u.name || u.username || u.email?.split('@')[0] || 'User',
+          email: u.email || '',
+          role: u.role || 'user',
+          joinedAt: u.joinedAt || u.createdAt || u.created_at || new Date().toISOString()
+        }))
+
+        setUsers(normalized)
+        // Cache locally for offline fallback
+        localStorage.setItem('registeredUsers', JSON.stringify(normalized))
+      } catch (err) {
+        console.warn('Failed to fetch users from API, using localStorage fallback:', err.message)
+        const stored = localStorage.getItem('registeredUsers')
+        const fallback = stored ? JSON.parse(stored) : []
+        setUsers(fallback)
+      }
     }
 
-    setUsers(usersList)
+    fetchUsers()
+  }, [])
+
+  // Trigger loading skeleton on tab change
+  useEffect(() => {
+    setTabLoading(true)
+    const timer = setTimeout(() => {
+      setTabLoading(false)
+    }, 600)
+    return () => clearTimeout(timer)
   }, [activeTab])
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 overflow-hidden">
+    <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 overflow-hidden transition-colors">
       <Sidebar
         user={user}
         activeTab={activeTab}
@@ -874,22 +987,25 @@ const AdminDashboard = ({ user, onSignOut, setToast }) => {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        {/* Mobile Header */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 sticky top-0 z-30">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-slate-100 cursor-pointer">
-            <svg className="w-5 h-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <span className="font-bold text-slate-900 text-sm">Admin — {ADMIN_NAV.find(n => n.id === activeTab)?.label}</span>
-        </header>
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors">
+        <Header 
+          title={`Admin — ${ADMIN_NAV.find(n => n.id === activeTab)?.label}`}
+          onMenuClick={() => setSidebarOpen(true)}
+          theme={theme}
+          setTheme={setTheme}
+        />
         <main className="flex-1 overflow-y-auto">
-          {activeTab === 'overview' && <AdminOverview users={users} />}
-          {activeTab === 'connect' && <QRConnect />}
-          {activeTab === 'listings' && <PropertyListings isAdmin />}
-          {activeTab === 'users' && <AdminUsersPanel users={users} />}
-          {activeTab === 'createUser' && <AdminCreateUserPanel setToast={setToast} />}
+          {tabLoading ? (
+            <SkeletonLoading tab={activeTab} />
+          ) : (
+            <>
+              {activeTab === 'overview' && <AdminOverview users={users} />}
+              {activeTab === 'connect' && <QRConnect />}
+              {activeTab === 'listings' && <PropertyListings isAdmin />}
+              {activeTab === 'users' && <AdminUsersPanel users={users} setActiveTab={setActiveTab} />}
+              {activeTab === 'createUser' && <AdminCreateUserPanel setToast={setToast} />}
+            </>
+          )}
         </main>
       </div>
     </div>
