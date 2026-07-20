@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { API_ENDPOINTS } from '../../api'
 
-const API_URL = 'https://lsrnm-39-34-138-157.free.pinggy.net/api/qr/latest'
+const API_URL = API_ENDPOINTS.qrLatest
 
 // WhatsApp QR codes expire in ~5 seconds
 const QR_EXPIRY_SECONDS = 5

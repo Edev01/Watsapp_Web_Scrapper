@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { API_ENDPOINTS } from '../../api'
 
 const SignIn = ({ setAuthUser, setToast }) => {
   const navigate = useNavigate()
@@ -47,7 +48,7 @@ const SignIn = ({ setAuthUser, setToast }) => {
 
     const callLoginApi = async () => {
       try {
-        const response = await fetch('https://lsrnm-39-34-138-157.free.pinggy.net/api/auth/login', {
+        const response = await fetch(API_ENDPOINTS.login, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

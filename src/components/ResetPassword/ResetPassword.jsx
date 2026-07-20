@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { API_ENDPOINTS } from '../../api'
 
 const ResetPassword = ({ setToast }) => {
   const [newPassword, setNewPassword] = useState('')
@@ -36,7 +37,7 @@ const ResetPassword = ({ setToast }) => {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch('https://lsrnm-39-34-138-157.free.pinggy.net/api/auth/reset-password', {
+      const response = await fetch(API_ENDPOINTS.resetPassword, {
         method: 'POST',
         headers,
         body: JSON.stringify({

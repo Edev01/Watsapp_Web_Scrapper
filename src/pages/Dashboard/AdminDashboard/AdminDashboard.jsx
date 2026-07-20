@@ -4,6 +4,7 @@ import QRConnect from '../../../components/QRConnect/QRConnect'
 import PropertyListings from '../../../components/PropertyListings/PropertyListings'
 import Header from '../../../components/Header/Header'
 import SkeletonLoading from '../../../components/SkeletonLoading/SkeletonLoading'
+import { API_ENDPOINTS } from '../../../api'
 
 // Admin nav items
 const ADMIN_NAV = [
@@ -643,7 +644,7 @@ const AdminCreateUserPanel = ({ setToast }) => {
           headers['Authorization'] = `Bearer ${token}`
         }
 
-        const response = await fetch('https://lsrnm-39-34-138-157.free.pinggy.net/api/users', {
+        const response = await fetch(API_ENDPOINTS.users, {
           method: 'POST',
           headers,
           body: JSON.stringify({
