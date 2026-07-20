@@ -29,6 +29,7 @@ const Dashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
     <UserDashboard 
       user={user} 
       onSignOut={handleSignOut} 
+      setToast={setToast} 
       theme={theme} 
       setTheme={setTheme} 
     />

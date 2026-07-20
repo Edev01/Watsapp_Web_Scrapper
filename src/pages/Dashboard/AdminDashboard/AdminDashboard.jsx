@@ -584,7 +584,7 @@ const AdminCreateUserPanel = ({ setToast }) => {
     fullName: '',
     email: '',
     password: '',
-    role: 'user'
+    phone_number: ''
   })
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState({})
@@ -618,6 +618,10 @@ const AdminCreateUserPanel = ({ setToast }) => {
       newErrors.password = 'Password must be at least 6 characters'
     }
 
+    if (!formData.phone_number.trim()) {
+      newErrors.phone_number = 'Phone number is required'
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
       if (setToast) {
@@ -644,7 +648,9 @@ const AdminCreateUserPanel = ({ setToast }) => {
           headers,
           body: JSON.stringify({
             email: formData.email,
-            password: formData.password
+            password: formData.password,
+            name: formData.fullName,
+            phone_number: formData.phone_number
           })
         });
 
@@ -658,7 +664,8 @@ const AdminCreateUserPanel = ({ setToast }) => {
             fullName: formData.fullName || data.fullName || 'New User',
             email: formData.email,
             password: formData.password,
-            role: formData.role,
+            phone_number: formData.phone_number,
+            role: 'user',
             joinedAt: new Date().toISOString()
           }
 
@@ -674,7 +681,7 @@ const AdminCreateUserPanel = ({ setToast }) => {
             fullName: '',
             email: '',
             password: '',
-            role: 'user'
+            phone_number: ''
           })
         } else {
           const errData = await response.json().catch(() => ({}))
@@ -703,7 +710,8 @@ const AdminCreateUserPanel = ({ setToast }) => {
           fullName: formData.fullName || 'Mock User',
           email: formData.email,
           password: formData.password,
-          role: formData.role,
+          phone_number: formData.phone_number,
+          role: 'user',
           joinedAt: new Date().toISOString()
         }
 
@@ -719,7 +727,7 @@ const AdminCreateUserPanel = ({ setToast }) => {
           fullName: '',
           email: '',
           password: '',
-          role: 'user'
+          phone_number: ''
         })
       }
     };
@@ -731,7 +739,7 @@ const AdminCreateUserPanel = ({ setToast }) => {
     <div className="p-6 max-w-xl mx-auto transition-colors">
       <div className="mb-6">
         <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Create User</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Register a new user or administrator on the platform</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Register a new user on the platform</p>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 shadow-sm transition-colors">
@@ -842,50 +850,34 @@ const AdminCreateUserPanel = ({ setToast }) => {
             )}
           </div>
 
-          {/* User Role */}
+          {/* Phone Number */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5">User Role</label>
-            <div className="grid grid-cols-2 gap-3">
-              {/* User Option */}
-              <label className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                formData.role === 'user' 
-                  ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 ring-1 ring-emerald-500' 
-                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-              }`}>
-                <input
-                  type="radio"
-                  name="role"
-                  value="user"
-                  checked={formData.role === 'user'}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 focus:ring-2"
-                />
-                <div>
-                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Standard User</p>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Access user dashboard & scrape data</p>
-                </div>
-              </label>
-
-              {/* Admin Option */}
-              <label className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                formData.role === 'admin' 
-                  ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 ring-1 ring-emerald-500' 
-                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-              }`}>
-                <input
-                  type="radio"
-                  name="role"
-                  value="admin"
-                  checked={formData.role === 'admin'}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 focus:ring-2"
-                />
-                <div>
-                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Administrator</p>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Full access to manage users & platform</p>
-                </div>
-              </label>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Phone Number</label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                name="phone_number"
+                value={formData.phone_number}
+                onChange={handleChange}
+                className={`w-full pl-11 pr-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
+                  errors.phone_number ? 'border-rose-500 ring-rose-500/20' : 'border-slate-200 dark:border-slate-600'
+                }`}
+                placeholder="Enter phone number (e.g., +1987654321)"
+              />
             </div>
+            {errors.phone_number && (
+              <p className="text-xs text-rose-500 font-medium mt-1.5 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {errors.phone_number}
+              </p>
+            )}
           </div>
 
           {/* Submit Button */}

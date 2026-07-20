@@ -201,7 +201,7 @@ const SkeletonLoading = ({ tab }) => {
     )
   }
 
-  if (tab === 'createUser') {
+  if (tab === 'createUser' || tab === 'resetPassword') {
     return (
       <div className="p-6 max-w-lg mx-auto animate-pulse">
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-6">

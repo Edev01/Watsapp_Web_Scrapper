@@ -304,7 +304,7 @@ const QRConnect = () => {
                 {status === STATUS.ERROR && 'Error fetching QR'}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-550">Backend: imuud-39-34-138-157.free.pinggy.net</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-550">Backend: lsrnm-39-34-138-157.free.pinggy.net</p>
 
             {/* Debug info */}
             {qrMeta && (

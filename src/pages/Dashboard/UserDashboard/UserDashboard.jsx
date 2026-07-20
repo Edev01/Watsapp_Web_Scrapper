@@ -6,13 +6,16 @@ import QRConnect from '../../../components/QRConnect/QRConnect'
 import Header from '../../../components/Header/Header'
 import SkeletonLoading from '../../../components/SkeletonLoading/SkeletonLoading'
 
+import ResetPassword from '../../../components/ResetPassword/ResetPassword'
+
 const USER_NAV = [
   { id: 'search', label: 'Search Properties', icon: 'home' },
   { id: 'connect', label: 'WhatsApp Connect', icon: 'qr' },
   { id: 'saved', label: 'Saved Listings', icon: 'heart' },
+  { id: 'resetPassword', label: 'Reset Password', icon: 'key' },
 ]
 
-const UserDashboard = ({ user, onSignOut, theme, setTheme }) => {
+const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('search')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -71,6 +74,7 @@ const UserDashboard = ({ user, onSignOut, theme, setTheme }) => {
                 </div>
               )}
               {activeTab === 'connect' && <QRConnect />}
+              {activeTab === 'resetPassword' && <ResetPassword setToast={setToast} />}
               {activeTab === 'saved' && (
                 <div className="p-6 text-center mt-16">
                   <svg className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
