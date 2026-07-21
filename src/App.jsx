@@ -94,6 +94,11 @@ function App() {
   // Auth state — read initial value from localStorage on load
   const [authUser, setAuthUser] = useState(() => {
     const saved = localStorage.getItem('currentUser')
+    const token = localStorage.getItem('authToken')
+    if (saved && !token) {
+      localStorage.removeItem('currentUser')
+      return null
+    }
     return saved ? JSON.parse(saved) : null
   })
 
@@ -103,6 +108,7 @@ function App() {
       localStorage.setItem('currentUser', JSON.stringify(authUser))
     } else {
       localStorage.removeItem('currentUser')
+      localStorage.removeItem('authToken')
     }
   }, [authUser])
 
@@ -115,6 +121,7 @@ function App() {
   }, [toast])
 
   const handleSignOut = () => {
+    localStorage.removeItem('authToken')
     setAuthUser(null)
     setToast({ type: 'success', message: 'Logged out successfully' })
   }

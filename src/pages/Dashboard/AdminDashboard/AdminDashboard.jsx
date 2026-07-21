@@ -580,7 +580,7 @@ const AdminUsersPanel = ({ users = [], setActiveTab }) => {
   )
 }
 
-const AdminCreateUserPanel = ({ setToast }) => {
+const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -656,23 +656,6 @@ const AdminCreateUserPanel = ({ setToast }) => {
         });
 
         if (response.ok) {
-          const data = await response.json();
-          // Sync with local storage user list
-          const stored = localStorage.getItem('registeredUsers')
-          const users = stored ? JSON.parse(stored) : []
-          
-          const newUser = {
-            fullName: formData.fullName || data.fullName || 'New User',
-            email: formData.email,
-            password: formData.password,
-            phone_number: formData.phone_number,
-            role: 'user',
-            joinedAt: new Date().toISOString()
-          }
-
-          users.push(newUser)
-          localStorage.setItem('registeredUsers', JSON.stringify(users))
-
           setIsLoading(false)
           if (setToast) {
             setToast({ type: 'success', message: `User ${formData.fullName || formData.email} created successfully on server! 🎉` })
@@ -684,52 +667,21 @@ const AdminCreateUserPanel = ({ setToast }) => {
             password: '',
             phone_number: ''
           })
+
+          if (onUserCreated) {
+            onUserCreated()
+          }
         } else {
           const errData = await response.json().catch(() => ({}))
           const errMsg = errData.message || errData.error || 'Failed to create user on server'
           throw new Error(errMsg)
         }
       } catch (apiError) {
-        console.warn("API create user failed, trying mock fallback...", apiError)
-
-        const stored = localStorage.getItem('registeredUsers')
-        const users = stored ? JSON.parse(stored) : []
-
-        const emailExists = users.some(u => u.email.toLowerCase() === formData.email.toLowerCase())
-        const isAdminEmail = formData.email.toLowerCase() === 'se.zeeshanhaider@gmail.com'
-
-        if (emailExists || isAdminEmail) {
-          setIsLoading(false)
-          setErrors({ email: 'A user with this email already exists' })
-          if (setToast) {
-            setToast({ type: 'error', message: 'Email address already registered' })
-          }
-          return
-        }
-
-        const newUser = {
-          fullName: formData.fullName || 'Mock User',
-          email: formData.email,
-          password: formData.password,
-          phone_number: formData.phone_number,
-          role: 'user',
-          joinedAt: new Date().toISOString()
-        }
-
-        users.push(newUser)
-        localStorage.setItem('registeredUsers', JSON.stringify(users))
-
+        console.error("API create user failed:", apiError)
         setIsLoading(false)
         if (setToast) {
-          setToast({ type: 'success', message: `User ${formData.fullName} created successfully! (Mock Fallback) 🎉` })
+          setToast({ type: 'error', message: apiError.message || 'Failed to create user' })
         }
-
-        setFormData({
-          fullName: '',
-          email: '',
-          password: '',
-          phone_number: ''
-        })
       }
     };
 
@@ -916,46 +868,42 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   const [users, setUsers] = useState([])
   const [tabLoading, setTabLoading] = useState(true)
 
-  // Fetch users from API (with localStorage fallback)
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const token = localStorage.getItem('authToken')
-        const headers = {
-          'Content-Type': 'application/json',
-          'bypass-tunnel-reminder': 'true'
-        }
-        if (token) headers['Authorization'] = `Bearer ${token}`
-
-        const res = await fetch('https://lsrnm-39-34-138-157.free.pinggy.net/api/users', { headers })
-        if (!res.ok) throw new Error(`Server error: ${res.status}`)
-        const json = await res.json()
-
-        // Normalize: API may return array or { users: [] } or { data: [] }
-        const list = Array.isArray(json) ? json
-          : Array.isArray(json.users) ? json.users
-          : Array.isArray(json.data) ? json.data
-          : []
-
-        // Normalize fields to our local shape
-        const normalized = list.map(u => ({
-          fullName: u.fullName || u.name || u.username || u.email?.split('@')[0] || 'User',
-          email: u.email || '',
-          role: u.role || 'user',
-          joinedAt: u.joinedAt || u.createdAt || u.created_at || new Date().toISOString()
-        }))
-
-        setUsers(normalized)
-        // Cache locally for offline fallback
-        localStorage.setItem('registeredUsers', JSON.stringify(normalized))
-      } catch (err) {
-        console.warn('Failed to fetch users from API, using localStorage fallback:', err.message)
-        const stored = localStorage.getItem('registeredUsers')
-        const fallback = stored ? JSON.parse(stored) : []
-        setUsers(fallback)
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('authToken')
+      const headers = {
+        'Content-Type': 'application/json',
+        'bypass-tunnel-reminder': 'true'
       }
-    }
+      if (token) headers['Authorization'] = `Bearer ${token}`
 
+      const res = await fetch(API_ENDPOINTS.users, { headers })
+      if (!res.ok) throw new Error(`Server error: ${res.status}`)
+      const json = await res.json()
+
+      // Normalize: API may return array or { users: [] } or { data: [] }
+      const list = Array.isArray(json) ? json
+        : Array.isArray(json.users) ? json.users
+        : Array.isArray(json.data) ? json.data
+        : []
+
+      // Normalize fields to our local shape
+      const normalized = list.map(u => ({
+        fullName: u.fullName || u.name || u.username || u.email?.split('@')[0] || 'User',
+        email: u.email || '',
+        role: u.role || 'user',
+        joinedAt: u.joinedAt || u.createdAt || u.created_at || new Date().toISOString()
+      }))
+
+      setUsers(normalized)
+    } catch (err) {
+      console.warn('Failed to fetch users from API:', err.message)
+      setUsers([])
+    }
+  }
+
+  // Fetch users from API
+  useEffect(() => {
     fetchUsers()
   }, [])
 
@@ -996,7 +944,7 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
               {activeTab === 'connect' && <QRConnect />}
               {activeTab === 'listings' && <PropertyListings isAdmin />}
               {activeTab === 'users' && <AdminUsersPanel users={users} setActiveTab={setActiveTab} />}
-              {activeTab === 'createUser' && <AdminCreateUserPanel setToast={setToast} />}
+              {activeTab === 'createUser' && <AdminCreateUserPanel setToast={setToast} onUserCreated={fetchUsers} />}
             </>
           )}
         </main>

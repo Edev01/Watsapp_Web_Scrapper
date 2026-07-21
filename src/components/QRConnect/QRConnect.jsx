@@ -5,7 +5,8 @@ import { API_ENDPOINTS } from '../../api'
 const API_URL = API_ENDPOINTS.qrLatest
 
 // WhatsApp QR codes expire in ~5 seconds
-const QR_EXPIRY_SECONDS = 5
+// WhatsApp QR codes expire in ~20 seconds
+const QR_EXPIRY_SECONDS = 10
 
 const STATUS = {
   IDLE: 'idle',
@@ -16,16 +17,17 @@ const STATUS = {
 }
 
 const isQRExpired = (createdAt) => {
-  if (!createdAt) return false // fallback to false if no timestamp returned
+  if (!createdAt) return false
   const created = new Date(createdAt)
   const ageSeconds = (Date.now() - created.getTime()) / 1000
+  // If it's older than 20 seconds, it's stale
   return ageSeconds > QR_EXPIRY_SECONDS
 }
 
 const QRConnect = () => {
   const [status, setStatus] = useState(STATUS.IDLE)
   const [qrData, setQrData] = useState(null)
-  const [qrMeta, setQrMeta] = useState(null) // { createdAt, pageUrl }
+  const [qrMeta, setQrMeta] = useState(null) // { createdAt, pageUrl, isStale }
   const [errorMsg, setErrorMsg] = useState('')
   const [countdown, setCountdown] = useState(QR_EXPIRY_SECONDS)
 
@@ -36,9 +38,13 @@ const QRConnect = () => {
     setQrMeta(null)
 
     try {
-      const res = await fetch(API_URL, {
+      // Prevent browser caching using a dynamic timestamp parameter
+      const cacheBustUrl = `${API_URL}${API_URL.includes('?') ? '&' : '?'}t=${Date.now()}`
+      const res = await fetch(cacheBustUrl, {
         headers: {
-          'bypass-tunnel-reminder': 'true'
+          'bypass-tunnel-reminder': 'true',
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
         }
       })
       if (!res.ok) throw new Error(`Server error: ${res.status}`)
@@ -50,16 +56,7 @@ const QRConnect = () => {
       if (!qrCode) throw new Error('QR data/URL not found in API response')
 
       const createdAt = json?.data?.created_at || json?.created_at || new Date().toISOString()
-
-      // Check if QR is already expired
-      if (isQRExpired(createdAt)) {
-        setErrorMsg(
-          `QR code is expired (generated: ${createdAt}). ` +
-          `Ask backend to refresh the WhatsApp session so a fresh QR is generated.`
-        )
-        setStatus(STATUS.EXPIRED)
-        return
-      }
+      const expired = isQRExpired(createdAt)
 
       // WhatsApp mobile needs to open WhatsApp. If it is a raw code, wrap it in a wa.me URL
       let formattedQr = qrCode
@@ -71,10 +68,19 @@ const QRConnect = () => {
       setQrMeta({
         createdAt,
         pageUrl: json?.data?.pageUrl || '',
-        source: json?.data?.source || 'API'
+        source: json?.data?.source || 'API',
+        isStale: expired
       })
+      
       setStatus(STATUS.QR_READY)
-      setCountdown(QR_EXPIRY_SECONDS)
+      if (expired) {
+        setErrorMsg(
+          `QR code generated on server is stale (generated: ${new Date(createdAt).toLocaleTimeString()}). ` +
+          `Please ensure the backend scrapper is active and refreshing the session.`
+        )
+      } else {
+        setCountdown(QR_EXPIRY_SECONDS)
+      }
 
     } catch (err) {
       console.warn('Failed to fetch real QR from server, using simulated/fallback QR:', err.message)
@@ -87,7 +93,8 @@ const QRConnect = () => {
       setQrMeta({
         createdAt: new Date().toISOString(),
         pageUrl: 'https://web.whatsapp.com',
-        source: 'Mock Fallback'
+        source: 'Mock Fallback',
+        isStale: false
       })
       setStatus(STATUS.QR_READY)
       setCountdown(QR_EXPIRY_SECONDS)
@@ -99,18 +106,28 @@ const QRConnect = () => {
     fetchQR()
   }, [fetchQR])
 
-  // Countdown timer when QR is ready — triggers fetchQR when countdown reaches 0
+  // Countdown timer / Polling when QR is ready
   useEffect(() => {
     if (status !== STATUS.QR_READY) return
+
+    // If QR is stale, poll the server every 5 seconds to detect if a fresh QR is generated
+    if (qrMeta?.isStale) {
+      const t = setTimeout(() => {
+        fetchQR()
+      }, 5000)
+      return () => clearTimeout(t)
+    }
+
+    // Normal countdown timer for fresh QR codes
     if (countdown <= 0) {
       fetchQR()
       return
     }
     const t = setTimeout(() => setCountdown(c => c - 1), 1000)
     return () => clearTimeout(t)
-  }, [status, countdown, fetchQR])
+  }, [status, countdown, fetchQR, qrMeta?.isStale])
 
-  // Auto-retry fetch after 5 seconds if expired or on error
+  // Auto-retry fetch after 5 seconds on error
   useEffect(() => {
     if (status !== STATUS.EXPIRED && status !== STATUS.ERROR) return
     const t = setTimeout(() => {
@@ -186,17 +203,26 @@ const QRConnect = () => {
           {/* QR READY */}
           {status === STATUS.QR_READY && qrData && (
             <div className="text-center">
-              {/* Countdown timer — above QR card */}
-              <div className="flex items-center justify-center mb-3">
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black text-white shadow ${
-                  countdown > 10 ? 'bg-emerald-500' : 'bg-rose-500'
-                }`}>
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {countdown}s remaining
+              {/* Countdown timer — above QR card (only show if not stale) */}
+              {!qrMeta?.isStale ? (
+                <div className="flex items-center justify-center mb-3">
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black text-white shadow ${
+                    countdown > 10 ? 'bg-emerald-500' : 'bg-rose-500'
+                  }`}>
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {countdown}s remaining
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="mb-3 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-left max-w-[230px] mx-auto animate-pulse">
+                  <p className="text-[10px] font-black text-amber-800 dark:text-amber-400">⚠️ Stale QR Code</p>
+                  <p className="text-[9px] text-amber-700 dark:text-amber-300 mt-0.5 leading-relaxed">
+                    Generated {Math.round((Date.now() - new Date(qrMeta.createdAt).getTime()) / 60000)}m ago. Auto-polling backend for fresh QR...
+                  </p>
+                </div>
+              )}
 
               {/* QR Code card */}
               <div className="inline-block mb-3">
@@ -305,7 +331,7 @@ const QRConnect = () => {
                 {status === STATUS.ERROR && 'Error fetching QR'}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-550">Backend: lsrnm-39-34-138-157.free.pinggy.net</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-550 font-mono truncate">Endpoint: {API_ENDPOINTS.qrLatest}</p>
 
             {/* Debug info */}
             {qrMeta && (
