@@ -61,13 +61,17 @@ const SignIn = ({ setAuthUser, setToast }) => {
         });
 
         if (response.ok) {
-          const data = await response.json();
-          const token = data.token || data.accessToken || '';
+          const resJson = await response.json();
+          const token = resJson.token || 
+                        resJson.accessToken || 
+                        resJson.data?.token || 
+                        resJson.data?.accessToken || 
+                        '';
           if (token) {
             localStorage.setItem('authToken', token);
           }
 
-          const userObj = data.user || data;
+          const userObj = resJson.user || resJson.data?.user || resJson;
           const email = userObj.email || signInData.email;
           const role = userObj.role || (email.toLowerCase().includes('admin') ? 'admin' : 'user');
           const fullName = userObj.fullName || userObj.name || (role === 'admin' ? 'Admin User' : 'Standard User');
@@ -89,48 +93,9 @@ const SignIn = ({ setAuthUser, setToast }) => {
           throw new Error(errMsg);
         }
       } catch (apiError) {
-        console.warn("API login failed, trying mock fallback...", apiError);
-
-        // Fallback for Admin Credentials
-        if (
-          (signInData.email === 'admin@example.com' && signInData.password === 'AdminPassword123') ||
-          (signInData.email === 'se.zeeshanhaider@gmail.com' && signInData.password === 'Zhsk99100$')
-        ) {
-          const adminUser = {
-            fullName: 'Zeeshan Haider',
-            email: signInData.email,
-            role: 'admin'
-          }
-          setAuthUser(adminUser)
-          setToast({ type: 'success', message: 'Welcome back, Admin! (Mock Fallback) 🎉' })
-          navigate('/dashboard')
-          setIsLoading(false)
-          return
-        }
-
-        // Fallback for user creation mock users in localStorage
-        const stored = localStorage.getItem('registeredUsers')
-        const users = stored ? JSON.parse(stored) : []
-        const matchedUser = users.find(u => u.email === signInData.email)
-
-        if (!matchedUser) {
-          setErrors({ email: 'No account found. Please check your credentials.' })
-          setToast({ type: 'error', message: 'No account found. Please check your credentials.' })
-          setIsLoading(false)
-          return
-        }
-
-        if (signInData.password !== matchedUser.password) {
-          setErrors({ password: 'Incorrect password. Please try again.' })
-          setToast({ type: 'error', message: 'Wrong password. Please try again.' })
-          setIsLoading(false)
-          return
-        }
-
-        setAuthUser(matchedUser)
-        setToast({ type: 'success', message: `Welcome back, ${matchedUser.fullName}! (Mock Fallback) 🎉` })
-        navigate('/dashboard')
-        setIsLoading(false)
+        console.error("API login failed:", apiError);
+        setToast({ type: 'error', message: apiError.message || 'API connection failed. Please check backend.' });
+        setIsLoading(false);
       }
     };
 
