@@ -5,12 +5,14 @@ import PropertyFilters, { DEFAULT_FILTERS } from '../../../components/PropertyFi
 import QRConnect from '../../../components/QRConnect/QRConnect'
 import Header from '../../../components/Header/Header'
 import SkeletonLoading from '../../../components/SkeletonLoading/SkeletonLoading'
+import ScrapedChats from '../../../components/ScrapedChats/ScrapedChats'
 
 import ResetPassword from '../../../components/ResetPassword/ResetPassword'
 
 const USER_NAV = [
   { id: 'search', label: 'Search Properties', icon: 'home' },
   { id: 'connect', label: 'WhatsApp Connect', icon: 'qr' },
+  { id: 'scrapedChats', label: 'Scraped Chats', icon: 'messages' },
   { id: 'saved', label: 'Saved Listings', icon: 'heart' },
   { id: 'resetPassword', label: 'Reset Password', icon: 'key' },
 ]
@@ -74,6 +76,7 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
                 </div>
               )}
               {activeTab === 'connect' && <QRConnect />}
+              {activeTab === 'scrapedChats' && <ScrapedChats setToast={setToast} />}
               {activeTab === 'resetPassword' && <ResetPassword setToast={setToast} />}
               {activeTab === 'saved' && (
                 <div className="p-6 text-center mt-16">
