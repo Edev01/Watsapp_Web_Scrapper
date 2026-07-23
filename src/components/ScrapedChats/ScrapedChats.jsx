@@ -55,7 +55,14 @@ const normalizeMessage = (message = {}, index) => {
     to,
     senderName: message.senderName || message.notifyName || message.pushName || message._data?.notifyName || from || 'Unknown sender',
     type: message.type || message.messageType || message._data?.type || 'message',
-    fromMe: Boolean(message.fromMe ?? message.from_me ?? message.isFromMe),
+    fromMe: Boolean(
+      message.fromMe ?? 
+      message.from_me ?? 
+      message.isFromMe ?? 
+      message.id?.fromMe ?? 
+      message.key?.fromMe ?? 
+      (typeof id === 'string' && id.startsWith('true_'))
+    ),
     createdAt: normalizeDate(message.created_at || message.createdAt || message.timestamp || message.t),
   }
 }
@@ -352,7 +359,7 @@ const ScrapedChats = ({ setToast }) => {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-5">
-        <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[600px]">
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">Chats</h2>
@@ -404,7 +411,7 @@ const ScrapedChats = ({ setToast }) => {
             </p>
           </div>
 
-          <div className="max-h-[620px] overflow-y-auto">
+          <div className="flex-1 overflow-y-auto">
             {loadingChats ? (
               <div className="p-4 space-y-3 animate-pulse">
                 {[1, 2, 3].map(item => (
@@ -514,7 +521,7 @@ const ScrapedChats = ({ setToast }) => {
           </div>
         </section>
 
-        <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden min-h-[520px] flex flex-col">
+        <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[600px]">
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="min-w-0">
               <h2 className="text-sm font-black text-slate-900 dark:text-slate-100 truncate">
