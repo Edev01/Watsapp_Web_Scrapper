@@ -6,8 +6,8 @@ const SkeletonLoading = ({ tab }) => {
     return (
       <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6 animate-pulse">
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[1, 2].map(i => (
             <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-3">
               <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" />
               <div className="h-7 bg-slate-300 dark:bg-slate-650 rounded w-24" />
@@ -32,38 +32,6 @@ const SkeletonLoading = ({ tab }) => {
                 className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-t"
                 style={{ height: `${h}%`, opacity: 0.5 }}
               />
-            ))}
-          </div>
-        </div>
-
-        {/* Bottom Split panels */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent activities */}
-          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
-            <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-36 mb-2" />
-            {[1, 2, 3].map(i => (
-              <div key={i} className="flex gap-3 py-2 border-b border-slate-100 dark:border-slate-700/50">
-                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 bg-slate-250 dark:bg-slate-650 rounded w-3/4" />
-                  <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Recent users */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
-            <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-24 mb-2" />
-            {[1, 2, 3].map(i => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 bg-slate-250 dark:bg-slate-650 rounded w-20" />
-                  <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded w-32" />
-                </div>
-                <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-10" />
-              </div>
             ))}
           </div>
         </div>
@@ -118,7 +86,7 @@ const SkeletonLoading = ({ tab }) => {
 
   if (tab === 'listings' || tab === 'search') {
     return (
-      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6 animate-pulse">
+      <div className="p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6 animate-pulse">
         {/* Title */}
         <div className="space-y-2">
           <div className="h-6 bg-slate-300 dark:bg-slate-600 rounded w-44" />

@@ -11,14 +11,19 @@ const PROPERTY_TYPES = {
   'Flat': ['Studio', '1 Bed', '2 Bed', '3 Bed', 'Penthouse', 'Lower Portion', 'Upper Portion'],
   'Plot': ['Residential Plot', 'Commercial Plot', 'Agricultural Land', 'Industrial Land'],
   'Commercial': ['Office', 'Shop', 'Warehouse', 'Factory', 'Building'],
-  'Room': ['Furnished Room', 'Hostel', 'Bed Space'],
 }
 
 const AREA_UNITS = ['Marla', 'Kanal', 'Sq. Ft.', 'Sq. Yd.']
 const CURRENCIES = ['PKR', 'USD', 'AED']
 const SORT_OPTIONS = ['Newest First', 'Price: Low → High', 'Price: High → Low', 'Area: Small → Large', 'Area: Large → Small']
-const POSSESSION = ['All', 'Ready', 'Under Construction', 'On Booking']
-const FURNISHED = ['All', 'Furnished', 'Semi-Furnished', 'Unfurnished']
+
+const formatPriceRangeLabel = (val) => {
+  if (!val || val === '0' || val === 0) return '0'
+  const num = Number(val)
+  if (num >= 10000000) return `${(num / 10000000).toFixed(1).replace(/\.0$/, '')} Cr`
+  if (num >= 100000) return `${(num / 100000).toFixed(0)} Lac`
+  return num.toLocaleString()
+}
 
 export const DEFAULT_FILTERS = {
   purpose: 'Buy',
@@ -46,11 +51,10 @@ const Chip = ({ label, active, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer whitespace-nowrap ${
-      active
+    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer whitespace-nowrap ${active
         ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400'
-    }`}
+      }`}
   >
     {label}
   </button>
@@ -88,11 +92,10 @@ const Toggle = ({ label, checked, onChange }) => (
   <button
     type="button"
     onClick={() => onChange(!checked)}
-    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-      checked 
-        ? 'bg-emerald-500 text-white border-emerald-500' 
+    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${checked
+        ? 'bg-emerald-500 text-white border-emerald-500'
         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-500'
-    }`}
+      }`}
   >
     <span className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 ${checked ? 'bg-white border-white' : 'border-slate-300 dark:border-slate-600'}`}>
       {checked && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block" />}
@@ -104,7 +107,6 @@ const Toggle = ({ label, checked, onChange }) => (
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
-  const [showMore, setShowMore] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const set = (key, val) => setFilters(prev => ({ ...prev, [key]: val }))
@@ -163,11 +165,10 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
                 type="button"
                 key={p}
                 onClick={() => set('purpose', p)}
-                className={`flex-1 py-2 text-sm font-bold transition-all cursor-pointer ${
-                  filters.purpose === p 
-                    ? 'bg-emerald-500 text-white' 
+                className={`flex-1 py-2 text-sm font-bold transition-all cursor-pointer ${filters.purpose === p
+                    ? 'bg-emerald-500 text-white'
                     : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                }`}
+                  }`}
               >
                 {p}
               </button>
@@ -184,10 +185,99 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
         </div>
       </div>
 
-      {/* Property Type */}
-      <div>
+      {/* Row 2: Price Scroller (Full Width) */}
+      {(() => {
+        const maxLimit = 50000000
+        const currentVal = !filters.priceMax ? maxLimit : Number(filters.priceMax)
+        const pct = Math.min(100, Math.max(0, (currentVal / maxLimit) * 100))
+
+        const presets = [
+          { label: 'Any Price', value: '' },
+          { label: '< 50 Lac', value: 5000000 },
+          { label: '< 1 Cr', value: 10000000 },
+          { label: '< 2.5 Cr', value: 25000000 },
+          { label: '< 5 Cr', value: 50000000 },
+        ]
+
+        return (
+          <div className="w-full bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 shadow-xs space-y-3 transition-colors">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Price Range (PKR)</span>
+              <span className="inline-flex items-center px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 font-extrabold text-xs shadow-xs">
+                {currentVal >= maxLimit ? 'PKR 0 — Any Price (5 Cr+)' : `PKR 0 — ${formatPriceRangeLabel(currentVal)}`}
+              </span>
+            </div>
+
+            {/* Custom Track Container */}
+            <div className="relative w-full py-1 flex items-center">
+              {/* Track Background & Filled Gradient */}
+              <div className="absolute left-0 right-0 h-2.5 rounded-full bg-slate-200/80 dark:bg-slate-700/80 overflow-hidden pointer-events-none border border-slate-300/30 dark:border-slate-600/30">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 rounded-full transition-all duration-75"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+
+              {/* Native Range Input */}
+              <input
+                type="range"
+                min="0"
+                max={maxLimit}
+                step="500000"
+                value={currentVal}
+                onChange={e => {
+                  const val = Number(e.target.value) >= maxLimit ? '' : e.target.value
+                  set('priceMax', val)
+                  set('priceMin', '')
+                }}
+                className="relative z-20 w-full h-5 opacity-0 cursor-pointer"
+              />
+
+              {/* Custom Thumb Knob */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 bg-white dark:bg-slate-900 border-2 border-emerald-500 rounded-full shadow-md shadow-emerald-500/20 pointer-events-none z-10 transition-all duration-75 flex items-center justify-center ring-4 ring-emerald-500/10"
+                style={{ left: `${pct}%` }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex items-center justify-between gap-1 pt-0.5">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 mr-1">Presets:</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {presets.map(p => {
+                  const isActive = p.value === '' 
+                    ? (!filters.priceMax || filters.priceMax == maxLimit)
+                    : Number(filters.priceMax) === p.value
+                  return (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => {
+                        set('priceMax', p.value === maxLimit || p.value === '' ? '' : String(p.value))
+                        set('priceMin', '')
+                      }}
+                      className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Property Type (Centered) */}
+      <div className="flex flex-col items-center justify-center text-center space-y-1.5">
         <Label>Property Type</Label>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
           {Object.keys(PROPERTY_TYPES).map(t => (
             <Chip
               key={t}
@@ -199,11 +289,11 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
         </div>
       </div>
 
-      {/* Sub Type */}
+      {/* Property Sub Type (Centered when active) */}
       {subTypes.length > 0 && (
-        <div>
+        <div className="flex flex-col items-center justify-center text-center space-y-1.5">
           <Label>Property Sub Type</Label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap justify-center gap-2">
             <Chip label="Any" active={!filters.propertySubType} onClick={() => set('propertySubType', '')} />
             {subTypes.map(s => (
               <Chip key={s} label={s} active={filters.propertySubType === s} onClick={() => set('propertySubType', s)} />
@@ -211,22 +301,6 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
           </div>
         </div>
       )}
-
-      {/* Price */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <Label>Currency</Label>
-          <FieldSelect value={filters.currency} onChange={v => set('currency', v)} options={CURRENCIES} />
-        </div>
-        <div>
-          <Label>Price Min ({filters.currency})</Label>
-          <FieldInput value={filters.priceMin} onChange={v => set('priceMin', v)} placeholder="Min price" type="number" />
-        </div>
-        <div>
-          <Label>Price Max ({filters.currency})</Label>
-          <FieldInput value={filters.priceMax} onChange={v => set('priceMax', v)} placeholder="Max price" type="number" />
-        </div>
-      </div>
 
       {/* Area */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -243,68 +317,6 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
           <FieldInput value={filters.areaMax} onChange={v => set('areaMax', v)} placeholder="Max area" type="number" />
         </div>
       </div>
-
-      {/* Beds + Baths */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <Label>Bedrooms</Label>
-          <div className="flex flex-wrap gap-2">
-            {['Any', '1', '2', '3', '4', '5', '6+'].map(b => (
-              <Chip key={b} label={b} active={filters.bedrooms === b} onClick={() => set('bedrooms', b)} />
-            ))}
-          </div>
-        </div>
-        <div>
-          <Label>Bathrooms</Label>
-          <div className="flex flex-wrap gap-2">
-            {['Any', '1', '2', '3', '4+'].map(b => (
-              <Chip key={b} label={b} active={filters.bathrooms === b} onClick={() => set('bathrooms', b)} />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Toggles */}
-      <div>
-        <Label>Listing Status</Label>
-        <div className="flex flex-wrap gap-2">
-          <Toggle label="✓ Verified Only" checked={filters.verified} onChange={v => set('verified', v)} />
-          <Toggle label="⭐ Featured / Premium" checked={filters.featured} onChange={v => set('featured', v)} />
-        </div>
-      </div>
-
-      {/* More Options */}
-      <button
-        type="button"
-        onClick={() => setShowMore(p => !p)}
-        className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-500 cursor-pointer"
-      >
-        <svg className={`w-4 h-4 transition-transform ${showMore ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-        {showMore ? 'Hide' : 'More'} Options
-      </button>
-
-      {showMore && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-700/60">
-          <div>
-            <Label>Possession Status</Label>
-            <div className="flex flex-wrap gap-2">
-              {POSSESSION.map(p => (
-                <Chip key={p} label={p} active={filters.possession === p} onClick={() => set('possession', p)} />
-              ))}
-            </div>
-          </div>
-          <div>
-            <Label>Furnishing</Label>
-            <div className="flex flex-wrap gap-2">
-              {FURNISHED.map(f => (
-                <Chip key={f} label={f} active={filters.furnished === f} onClick={() => set('furnished', f)} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Footer: Reset + Search */}
       <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700/60">

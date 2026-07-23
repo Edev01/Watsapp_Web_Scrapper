@@ -62,7 +62,7 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
           ) : (
             <>
               {activeTab === 'search' && (
-                <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+                <div className="p-4 sm:p-6 max-w-7xl w-full mx-auto">
                   <div className="mb-5">
                     <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">Search Properties</h1>
                     <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Set your filters and click Search to view results</p>

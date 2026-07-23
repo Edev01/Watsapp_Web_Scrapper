@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Sidebar from '../../../components/Sidebar/Sidebar'
 import QRConnect from '../../../components/QRConnect/QRConnect'
-import PropertyListings from '../../../components/PropertyListings/PropertyListings'
 import Header from '../../../components/Header/Header'
 import SkeletonLoading from '../../../components/SkeletonLoading/SkeletonLoading'
 import { API_ENDPOINTS } from '../../../api'
@@ -9,12 +8,11 @@ import { API_ENDPOINTS } from '../../../api'
 // Admin nav items
 const ADMIN_NAV = [
   { id: 'overview', label: 'Overview', icon: 'grid' },
-  { id: 'listings', label: 'All Listings', icon: 'home' },
   { id: 'users', label: 'Users', icon: 'users' },
   { id: 'createUser', label: 'Create User', icon: 'userPlus' },
 ]
 
-const StatCard = ({ label, value, sub, color }) => {
+const StatCard = ({ label, value, sub, color, onClick }) => {
   const colorMap = {
     'text-emerald-600': 'text-emerald-600 dark:text-emerald-400',
     'text-blue-600': 'text-blue-600 dark:text-blue-400',
@@ -24,30 +22,17 @@ const StatCard = ({ label, value, sub, color }) => {
   const displayColor = colorMap[color] || color || 'text-slate-900 dark:text-slate-100'
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-colors">
+    <div 
+      onClick={onClick}
+      className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-all ${
+        onClick ? 'cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md active:scale-[0.99]' : ''
+      }`}
+    >
       <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">{label}</p>
       <p className={`text-2xl font-extrabold ${displayColor}`}>{value}</p>
       {sub && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{sub}</p>}
     </div>
   )
-}
-
-const getRelativeTime = (isoString) => {
-  if (!isoString) return 'N/A'
-  const joined = new Date(isoString)
-  const now = new Date()
-  const diffMs = now - joined
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHrs = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHrs / 24)
-
-  if (diffMins < 60) {
-    return `${diffMins || 1} min ago`
-  } else if (diffHrs < 24) {
-    return `${diffHrs} hr ago`
-  } else {
-    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
-  }
 }
 
 const getGraphData = (users, timeframe) => {
@@ -331,11 +316,8 @@ const UsersOnboardingChart = ({ users = [], theme }) => {
   )
 }
 
-const AdminOverview = ({ users = [], theme }) => {
+const AdminOverview = ({ users = [], theme, setActiveTab }) => {
   const totalUsers = users.length
-  const recentUsers = [...users]
-    .sort((a, b) => new Date(b.joinedAt) - new Date(a.joinedAt))
-    .slice(0, 4)
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -343,69 +325,20 @@ const AdminOverview = ({ users = [], theme }) => {
         <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100">Admin Overview</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Platform statistics and management</p>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Listings" value="1,284" sub="+48 today" color="text-emerald-600" />
-        <StatCard label="Total Users" value={totalUsers} sub="Registered users" color="text-blue-600" />
-        <StatCard label="Scraped Today" value="892" sub="From 12 groups" color="text-purple-600" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <StatCard 
+          label="Total Users" 
+          value={totalUsers} 
+          sub="Registered users" 
+          color="text-blue-600" 
+          onClick={() => setActiveTab && setActiveTab('users')}
+        />
         <StatCard label="WhatsApp Groups" value="12" sub="All connected" color="text-amber-600" />
       </div>
 
       {/* Users Onboarding Chart */}
-      <div className="mb-6">
+      <div>
         <UsersOnboardingChart users={users} theme={theme} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Recent Activity */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-colors">
-          <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-4 text-sm">Recent Scrape Activity</h3>
-          <div className="space-y-3">
-            {[
-              { group: 'Scheme 33 Properties', count: 48, time: '5 min ago', status: 'success' },
-              { group: 'Karachi Real Estate', count: 126, time: '22 min ago', status: 'success' },
-              { group: 'DHA Karachi Deals', count: 34, time: '1 hr ago', status: 'success' },
-              { group: 'Gulshan Property Hub', count: 71, time: '2 hr ago', status: 'warning' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
-                <div>
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{item.group}</p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500">{item.count} listings · {item.time}</p>
-                </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  item.status === 'success' 
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' 
-                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
-                }`}>
-                  {item.status === 'success' ? 'OK' : 'Slow'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-        {/* Recent Users */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-colors">
-          <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-4 text-sm">Recent Users</h3>
-          <div className="space-y-3">
-            {recentUsers.length === 0 ? (
-              <div className="text-center py-8 text-slate-400">
-                <p className="text-xs font-medium">No recent users</p>
-              </div>
-            ) : (
-              recentUsers.map((u, i) => (
-                <div key={i} className="flex items-center gap-3 py-2 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
-                  <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center justify-center shrink-0">
-                    {u.fullName?.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{u.fullName}</p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{u.email}</p>
-                  </div>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0">{getRelativeTime(u.joinedAt)}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
       </div>
     </div>
   )
@@ -658,7 +591,7 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
         if (response.ok) {
           setIsLoading(false)
           if (setToast) {
-            setToast({ type: 'success', message: `User ${formData.fullName || formData.email} created successfully on server! 🎉` })
+            setToast({ type: 'success', message: `User ${formData.fullName || formData.email} created successfully on server!` })
           }
 
           setFormData({
@@ -940,9 +873,8 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
             <SkeletonLoading tab={activeTab} />
           ) : (
             <>
-              {activeTab === 'overview' && <AdminOverview users={users} />}
+              {activeTab === 'overview' && <AdminOverview users={users} theme={theme} setActiveTab={setActiveTab} />}
               {activeTab === 'connect' && <QRConnect />}
-              {activeTab === 'listings' && <PropertyListings isAdmin />}
               {activeTab === 'users' && <AdminUsersPanel users={users} setActiveTab={setActiveTab} />}
               {activeTab === 'createUser' && <AdminCreateUserPanel setToast={setToast} onUserCreated={fetchUsers} />}
             </>
