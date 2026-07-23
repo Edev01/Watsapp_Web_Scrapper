@@ -10,8 +10,8 @@ const SignIn = ({ setAuthUser, setToast }) => {
   const [errors, setErrors] = useState({})
 
   const [signInData, setSignInData] = useState({
-    email: 'se.zeeshanhaider@gmail.com',
-    password: 'Zhsk99100$'
+    email: '',
+    password: ''
   })
 
   const handleChange = (e) => {

@@ -707,7 +707,7 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
                 className={`w-full pl-11 pr-11 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
                   errors.password ? 'border-rose-500 ring-rose-500/20' : 'border-slate-200 dark:border-slate-600'
                 }`}
-                placeholder="Enter password (min 6 chars)"
+                placeholder="Enter password"
               />
               <button
                 type="button"
@@ -753,7 +753,7 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
                 className={`w-full pl-11 pr-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
                   errors.phone_number ? 'border-rose-500 ring-rose-500/20' : 'border-slate-200 dark:border-slate-600'
                 }`}
-                placeholder="Enter phone number (e.g., +1987654321)"
+                placeholder="Enter phone number"
               />
             </div>
             {errors.phone_number && (

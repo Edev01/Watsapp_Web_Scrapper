@@ -10,8 +10,8 @@ const Dashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
     navigate('/signin')
   }
 
-  // Role check: admin email or role field
-  const isAdmin = user?.role === 'admin' || user?.email === 'se.zeeshanhaider@gmail.com'
+  // Role check: admin role
+  const isAdmin = user?.role === 'admin'
 
   if (isAdmin) {
     return (
