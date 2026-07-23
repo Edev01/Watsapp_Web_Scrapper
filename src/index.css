@@ -197,3 +197,7 @@ select option {
   background-color: #1e293b !important;
   color: #f8fafc !important;
 }
+/* Scrollbar dark mode support */
+html.dark {
+  color-scheme: dark;
+}

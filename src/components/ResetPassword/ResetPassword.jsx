@@ -102,7 +102,7 @@ const ResetPassword = ({ setToast }) => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full pl-11 pr-11 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700"
-                placeholder="Enter new password (min 6 chars)"
+                placeholder="Enter new password"
               />
               <button
                 type="button"
