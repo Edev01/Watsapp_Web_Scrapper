@@ -84,7 +84,7 @@ const SignIn = ({ setAuthUser, setToast }) => {
           };
 
           setAuthUser(loggedInUser);
-          setToast({ type: 'success', message: `Welcome back, ${fullName}! 🎉` });
+          setToast({ type: 'success', message: `Welcome back, ${fullName}!` });
           navigate('/dashboard');
           setIsLoading(false);
         } else {

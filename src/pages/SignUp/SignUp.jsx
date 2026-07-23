@@ -102,7 +102,7 @@ const SignUp = ({ setToast }) => {
 
       setIsLoading(false)
       // Notify parent (App) + show toast
-      setToast({ type: 'success', message: `Account created! Welcome, ${signUpData.fullName} 🎉` })
+      setToast({ type: 'success', message: `Account created! Welcome, ${signUpData.fullName}` })
       navigate('/signin')
     }, 1500)
   }
