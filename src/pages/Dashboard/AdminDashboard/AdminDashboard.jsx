@@ -796,10 +796,16 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
 }
 
 const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('admin_active_tab') || 'overview'
+  })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [users, setUsers] = useState([])
   const [tabLoading, setTabLoading] = useState(true)
+
+  useEffect(() => {
+    localStorage.setItem('admin_active_tab', activeTab)
+  }, [activeTab])
 
   const fetchUsers = async () => {
     try {
