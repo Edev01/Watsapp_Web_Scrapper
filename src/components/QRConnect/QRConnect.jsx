@@ -157,7 +157,7 @@ const QRConnect = () => {
   }, [qrMeta?.createdAt])
 
   return (
-    <div className="p-8 max-w-4xl mx-auto transition-colors">
+    <div className="p-8 max-w-lg mx-auto transition-colors text-center">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 mb-1">WhatsApp Connection</h1>
@@ -166,153 +166,97 @@ const QRConnect = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Panel: QR Code Box */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex flex-col items-center justify-center min-h-[380px] transition-colors relative">
+      {/* QR Code Box */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex flex-col items-center justify-center min-h-[380px] transition-colors relative">
 
-          {/* LOADING STATE */}
-          {status === STATUS.LOADING && (
-            <div className="text-center py-8">
-              <div className="w-14 h-14 rounded-full border-4 border-emerald-200 border-t-emerald-500 animate-spin mx-auto mb-4" />
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Fetching live QR code...</p>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Connecting to scrapper node server</p>
-            </div>
-          )}
-
-          {/* READY STATE (QR Code display) */}
-          {status === STATUS.READY && qrData && (
-            <div className="text-center flex flex-col items-center w-full">
-              {/* Live sync badge */}
-              <div className="flex items-center gap-2 mb-4 px-3.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50">
-                <span className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
-                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                  {socketConnected ? 'WebSocket Live Sync' : 'Live Sync Active'}
-                </span>
-              </div>
-
-              {/* QR Code Container */}
-              <div className="p-4 bg-white rounded-2xl border-2 border-emerald-100 dark:border-slate-700 shadow-md transition-transform hover:scale-[1.01]">
-                <QRCodeSVG
-                  value={qrData}
-                  size={220}
-                  bgColor="#ffffff"
-                  fgColor="#0f172a"
-                  level="H"
-                />
-              </div>
-
-              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-4">
-                Open WhatsApp → Linked Devices → Link a Device
-              </p>
-              
-              <div className="flex items-center justify-center gap-3 mt-2">
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                  Last updated: <span className="font-semibold text-slate-600 dark:text-slate-400">{lastUpdatedText}</span>
-                </p>
-                <button
-                  onClick={() => fetchQR(false)}
-                  className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 font-bold underline cursor-pointer"
-                >
-                  ↺ Refresh
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* CONNECTED / DISAPPEARED STATE */}
-          {status === STATUS.CONNECTED && (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center mx-auto mb-4 text-emerald-600 dark:text-emerald-400">
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p className="text-base font-black text-slate-900 dark:text-slate-100 mb-1">WhatsApp Connected!</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[240px] mx-auto mb-4">
-                The QR code was scanned or linked successfully.
-              </p>
-              <button 
-                onClick={() => fetchQR(false)} 
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs transition-colors cursor-pointer"
-              >
-                Check QR Status
-              </button>
-            </div>
-          )}
-
-          {/* ERROR STATE */}
-          {status === STATUS.ERROR && (
-            <div className="text-center py-6">
-              <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center mx-auto mb-3">
-                <svg className="w-7 h-7 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <p className="text-sm font-bold text-rose-600 dark:text-rose-400 mb-1">Server Connection Failed</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-[220px] mx-auto">{errorMsg}</p>
-              <button 
-                onClick={() => fetchQR(false)} 
-                className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-emerald-500 transition-colors shadow-sm"
-              >
-                Retry Connection
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Right Panel */}
-        <div className="flex flex-col gap-4">
-          {/* Instructions */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-colors">
-            <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-4 text-sm">How to Connect</h3>
-            <div className="space-y-3">
-              {[
-                { step: '1', title: 'Open WhatsApp on Phone', desc: 'Ensure your app is updated to latest version' },
-                { step: '2', title: 'Go to Linked Devices', desc: 'Tap Menu (⋮) or Settings → Linked Devices' },
-                { step: '3', title: 'Tap Link a Device', desc: 'Point your camera at the QR code on screen' },
-                { step: '4', title: 'Start Scraping', desc: 'Session will automatically authenticate and begin' },
-              ].map(item => (
-                <div key={item.step} className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {item.step}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{item.title}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* LOADING STATE */}
+        {status === STATUS.LOADING && (
+          <div className="text-center py-8">
+            <div className="w-14 h-14 rounded-full border-4 border-emerald-200 border-t-emerald-500 animate-spin mx-auto mb-4" />
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Fetching live QR code...</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Connecting to scrapper node server</p>
           </div>
+        )}
 
-          {/* Connection Status Card */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm transition-colors">
-            <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-3 text-sm">Connection Details</h3>
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                socketConnected ? 'bg-emerald-500 animate-pulse' :
-                status === STATUS.READY ? 'bg-amber-400 animate-pulse' : 'bg-rose-500'
-              }`} />
-              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                {socketConnected ? 'WebSocket Live Sync Active' : status === STATUS.READY ? 'Syncing via API' : 'Offline'}
+        {/* READY STATE (QR Code display) */}
+        {status === STATUS.READY && qrData && (
+          <div className="text-center flex flex-col items-center w-full">
+            {/* Live sync badge */}
+            <div className="flex items-center gap-2 mb-4 px-3.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50">
+              <span className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                {socketConnected ? 'WebSocket Live Sync' : 'Live Sync Active'}
               </span>
             </div>
 
-            <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl space-y-1 transition-colors">
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
-                <strong className="text-slate-700 dark:text-slate-300">Endpoint:</strong> {API_URL}
+            {/* QR Code Container */}
+            <div className="p-4 bg-white rounded-2xl border-2 border-emerald-100 dark:border-slate-700 shadow-md transition-transform hover:scale-[1.01]">
+              <QRCodeSVG
+                value={qrData}
+                size={220}
+                bgColor="#ffffff"
+                fgColor="#0f172a"
+                level="H"
+              />
+            </div>
+
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-4">
+              Open WhatsApp → Linked Devices → Link a Device
+            </p>
+            
+            <div className="flex items-center justify-center gap-3 mt-2">
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                Last updated: <span className="font-semibold text-slate-600 dark:text-slate-400">{lastUpdatedText}</span>
               </p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
-                <strong className="text-slate-700 dark:text-slate-300">Socket:</strong> {SOCKET_BASE_URL}
-              </p>
-              {qrMeta?.source && (
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                  <strong className="text-slate-700 dark:text-slate-300">Source:</strong> {qrMeta.source}
-                </p>
-              )}
+              <button
+                onClick={() => fetchQR(false)}
+                className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 font-bold underline cursor-pointer"
+              >
+                ↺ Refresh
+              </button>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* CONNECTED / DISAPPEARED STATE */}
+        {status === STATUS.CONNECTED && (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center mx-auto mb-4 text-emerald-600 dark:text-emerald-400">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-base font-black text-slate-900 dark:text-slate-100 mb-1">WhatsApp Connected!</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[240px] mx-auto mb-4">
+              The QR code was scanned or linked successfully.
+            </p>
+            <button 
+              onClick={() => fetchQR(false)} 
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+            >
+              Check QR Status
+            </button>
+          </div>
+        )}
+
+        {/* ERROR STATE */}
+        {status === STATUS.ERROR && (
+          <div className="text-center py-6">
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center mx-auto mb-3">
+              <svg className="w-7 h-7 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <p className="text-sm font-bold text-rose-600 dark:text-rose-400 mb-1">Server Connection Failed</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-[220px] mx-auto">{errorMsg}</p>
+            <button 
+              onClick={() => fetchQR(false)} 
+              className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-emerald-500 transition-colors shadow-sm"
+            >
+              Retry Connection
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
