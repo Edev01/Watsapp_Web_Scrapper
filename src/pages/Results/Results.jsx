@@ -19,27 +19,15 @@ const ALL_LISTINGS = [
 
 const applyFilters = (listings, f) =>
   listings.filter(p => {
-    if (f.purpose !== 'All' && p.purpose !== f.purpose) return false
-    if (f.city !== 'All Cities' && p.city !== f.city) return false
+    if (f.purpose && f.purpose !== 'All' && p.purpose !== f.purpose) return false
+    if (f.city && f.city !== 'All Cities' && p.city !== f.city) return false
     if (f.location && !p.location.toLowerCase().includes(f.location.toLowerCase())) return false
-    if (f.propertyType !== 'All' && p.type !== f.propertyType) return false
+    if (f.propertyType && f.propertyType !== 'All' && p.type !== f.propertyType) return false
     if (f.propertySubType && p.subType !== f.propertySubType) return false
-    if (f.bedrooms !== 'Any') {
-      if (f.bedrooms === '6+' && p.bedrooms < 6) return false
-      if (f.bedrooms !== '6+' && p.bedrooms !== parseInt(f.bedrooms)) return false
-    }
-    if (f.bathrooms !== 'Any') {
-      if (f.bathrooms === '4+' && p.bathrooms < 4) return false
-      if (f.bathrooms !== '4+' && p.bathrooms !== parseInt(f.bathrooms)) return false
-    }
     if (f.priceMin && p.price < parseFloat(f.priceMin)) return false
     if (f.priceMax && p.price > parseFloat(f.priceMax)) return false
     if (f.areaMin && p.areaUnit === f.areaUnit && p.area < parseFloat(f.areaMin)) return false
     if (f.areaMax && p.areaUnit === f.areaUnit && p.area > parseFloat(f.areaMax)) return false
-    if (f.verified && !p.verified) return false
-    if (f.featured && !p.featured) return false
-    if (f.possession !== 'All' && p.possession !== f.possession) return false
-    if (f.furnished !== 'All' && p.furnished !== f.furnished) return false
     return true
   }).sort((a, b) => {
     if (f.sortBy === 'Price: Low → High') return a.price - b.price

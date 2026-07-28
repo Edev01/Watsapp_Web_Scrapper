@@ -36,14 +36,7 @@ export const DEFAULT_FILTERS = {
   areaMin: '',
   areaMax: '',
   areaUnit: 'Marla',
-  bedrooms: 'Any',
-  bathrooms: 'Any',
-  currency: 'PKR',
   sortBy: 'Newest First',
-  verified: false,
-  featured: false,
-  possession: 'All',
-  furnished: 'All',
 }
 
 // Helper components defined at MODULE level — never remounted
