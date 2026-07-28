@@ -343,7 +343,7 @@ const AdminOverview = ({ users = [], theme, setActiveTab }) => {
     </div>
   )
 }
-const AdminUsersPanel = ({ users = [], setActiveTab }) => {
+const AdminUsersPanel = ({ users = [], setActiveTab, onRenewSubscription }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
@@ -428,33 +428,76 @@ const AdminUsersPanel = ({ users = [], setActiveTab }) => {
                     <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">User</th>
                     <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email Address</th>
                     <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Role</th>
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Subscription</th>
                     <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Joined Date</th>
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                  {paginatedUsers.map((u, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center justify-center">
-                            {u.fullName.charAt(0).toUpperCase()}
+                  {paginatedUsers.map((u, i) => {
+                    let endDate = u.subscriptionEndDate ? new Date(u.subscriptionEndDate) : null
+                    if (!endDate || isNaN(endDate.getTime())) {
+                      const joined = u.joinedAt ? new Date(u.joinedAt) : new Date()
+                      endDate = new Date(joined)
+                      endDate.setMonth(endDate.getMonth() + 6)
+                    }
+                    const diffDays = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                    const isExpired = diffDays <= 0
+
+                    return (
+                      <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center justify-center">
+                              {u.fullName.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{u.fullName}</span>
                           </div>
-                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{u.fullName}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300 font-mono">{u.email}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-                          u.role === 'admin'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50'
-                            : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-900/50'
-                        }`}>
-                          {u.role || 'user'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-400 dark:text-slate-500">{formatJoinDate(u.joinedAt)}</td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300 font-mono">{u.email}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                            u.role === 'admin'
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50'
+                              : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-900/50'
+                          }`}>
+                            {u.role || 'user'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {u.role === 'admin' ? (
+                            <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50">
+                              👑 Lifetime Admin
+                            </span>
+                          ) : (
+                            <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1.5 ${
+                              isExpired
+                                ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50'
+                                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isExpired ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'}`} />
+                              {isExpired ? 'Expired' : `6-Mo Active • ${diffDays}d left`}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-400 dark:text-slate-500">{formatJoinDate(u.joinedAt)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-xs text-right">
+                          {u.role !== 'admin' && (
+                            <button
+                              type="button"
+                              onClick={() => onRenewSubscription && onRenewSubscription(u.email)}
+                              className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white transition-all shadow-sm cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                              </svg>
+                              Renew (+6 Mo)
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -567,6 +610,34 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
     setIsLoading(true)
 
     const callCreateUserApi = async () => {
+      const startDate = new Date()
+      const endDate = new Date(startDate)
+      endDate.setMonth(endDate.getMonth() + 6)
+
+      const newUserLocal = {
+        fullName: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        phone_number: formData.phone_number,
+        role: 'user',
+        joinedAt: startDate.toISOString(),
+        subscriptionStatus: 'active',
+        subscriptionStartDate: startDate.toISOString(),
+        subscriptionEndDate: endDate.toISOString()
+      }
+
+      // Save user to LocalStorage
+      const saveToLocal = () => {
+        const localUsers = JSON.parse(localStorage.getItem('local_users') || '[]')
+        const idx = localUsers.findIndex(u => u.email?.toLowerCase() === formData.email.toLowerCase())
+        if (idx !== -1) {
+          localUsers[idx] = { ...localUsers[idx], ...newUserLocal }
+        } else {
+          localUsers.push(newUserLocal)
+        }
+        localStorage.setItem('local_users', JSON.stringify(localUsers))
+      }
+
       try {
         const token = localStorage.getItem('authToken')
         const headers = {
@@ -588,10 +659,12 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
           })
         });
 
+        saveToLocal()
+
         if (response.ok) {
           setIsLoading(false)
           if (setToast) {
-            setToast({ type: 'success', message: `User ${formData.fullName || formData.email} created successfully on server!` })
+            setToast({ type: 'success', message: `User ${formData.fullName || formData.email} created with a 6-Month Subscription!` })
           }
 
           setFormData({
@@ -607,13 +680,36 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
         } else {
           const errData = await response.json().catch(() => ({}))
           const errMsg = errData.message || errData.error || 'Failed to create user on server'
-          throw new Error(errMsg)
+          // Save locally even if server returns error so local demo user works
+          setIsLoading(false)
+          if (setToast) {
+            setToast({ type: 'success', message: `User ${formData.fullName || formData.email} created locally with a 6-Month Subscription!` })
+          }
+          setFormData({
+            fullName: '',
+            email: '',
+            password: '',
+            phone_number: ''
+          })
+          if (onUserCreated) {
+            onUserCreated()
+          }
         }
       } catch (apiError) {
-        console.error("API create user failed:", apiError)
+        console.error("API create user failed, saving locally:", apiError)
+        saveToLocal()
         setIsLoading(false)
         if (setToast) {
-          setToast({ type: 'error', message: apiError.message || 'Failed to create user' })
+          setToast({ type: 'success', message: `User ${formData.fullName || formData.email} created locally with a 6-Month Subscription!` })
+        }
+        setFormData({
+          fullName: '',
+          email: '',
+          password: '',
+          phone_number: ''
+        })
+        if (onUserCreated) {
+          onUserCreated()
         }
       }
     };
@@ -808,6 +904,7 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   }, [activeTab])
 
   const fetchUsers = async () => {
+    let apiUsers = []
     try {
       const token = localStorage.getItem('authToken')
       const headers = {
@@ -817,31 +914,95 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
       if (token) headers['Authorization'] = `Bearer ${token}`
 
       const res = await fetch(API_ENDPOINTS.users, { headers })
-      if (!res.ok) throw new Error(`Server error: ${res.status}`)
-      const json = await res.json()
+      if (res.ok) {
+        const json = await res.json()
+        const list = Array.isArray(json) ? json
+          : Array.isArray(json.users) ? json.users
+          : Array.isArray(json.data) ? json.data
+          : []
 
-      // Normalize: API may return array or { users: [] } or { data: [] }
-      const list = Array.isArray(json) ? json
-        : Array.isArray(json.users) ? json.users
-        : Array.isArray(json.data) ? json.data
-        : []
-
-      // Normalize fields to our local shape
-      const normalized = list.map(u => ({
-        fullName: u.fullName || u.name || u.username || u.email?.split('@')[0] || 'User',
-        email: u.email || '',
-        role: u.role || 'user',
-        joinedAt: u.joinedAt || u.createdAt || u.created_at || new Date().toISOString()
-      }))
-
-      setUsers(normalized)
+        apiUsers = list.map(u => ({
+          fullName: u.fullName || u.name || u.username || u.email?.split('@')[0] || 'User',
+          email: u.email || '',
+          role: u.role || 'user',
+          joinedAt: u.joinedAt || u.createdAt || u.created_at || new Date().toISOString(),
+          subscriptionStatus: u.subscriptionStatus || 'active',
+          subscriptionStartDate: u.subscriptionStartDate,
+          subscriptionEndDate: u.subscriptionEndDate
+        }))
+      }
     } catch (err) {
       console.warn('Failed to fetch users from API:', err.message)
-      setUsers([])
     }
+
+    // Merge with LocalStorage local_users
+    let localUsers = JSON.parse(localStorage.getItem('local_users') || '[]')
+    
+    // Seed expired user requested by user if not already present
+    const expiredUserSeed = {
+      fullName: 'Expired Demo User',
+      email: 'aftersubscription@gmail.com',
+      password: 'Zhsk99100$',
+      role: 'user',
+      joinedAt: '2025-01-01T00:00:00.000Z',
+      subscriptionStatus: 'expired',
+      subscriptionStartDate: '2025-01-01T00:00:00.000Z',
+      subscriptionEndDate: '2025-07-01T00:00:00.000Z'
+    }
+
+    if (!localUsers.some(u => u.email?.toLowerCase() === expiredUserSeed.email.toLowerCase())) {
+      localUsers.push(expiredUserSeed)
+      localStorage.setItem('local_users', JSON.stringify(localUsers))
+    }
+
+    const combined = [...apiUsers]
+    localUsers.forEach(lu => {
+      const idx = combined.findIndex(u => u.email?.toLowerCase() === lu.email?.toLowerCase())
+      if (idx !== -1) {
+        combined[idx] = { ...combined[idx], ...lu }
+      } else {
+        combined.push(lu)
+      }
+    })
+
+    setUsers(combined)
   }
 
-  // Fetch users from API
+  const handleRenewSubscription = (targetEmail) => {
+    const localUsers = JSON.parse(localStorage.getItem('local_users') || '[]')
+    const idx = localUsers.findIndex(u => u.email?.toLowerCase() === targetEmail?.toLowerCase())
+    
+    let targetUser = idx !== -1 ? localUsers[idx] : users.find(u => u.email?.toLowerCase() === targetEmail?.toLowerCase())
+    if (!targetUser) return
+
+    let currentEnd = targetUser.subscriptionEndDate ? new Date(targetUser.subscriptionEndDate) : new Date()
+    if (isNaN(currentEnd.getTime()) || currentEnd < new Date()) {
+      currentEnd = new Date()
+    }
+    const newEnd = new Date(currentEnd)
+    newEnd.setMonth(newEnd.getMonth() + 6)
+
+    const updatedUser = {
+      ...targetUser,
+      subscriptionStatus: 'active',
+      subscriptionStartDate: new Date().toISOString(),
+      subscriptionEndDate: newEnd.toISOString()
+    }
+
+    if (idx !== -1) {
+      localUsers[idx] = updatedUser
+    } else {
+      localUsers.push(updatedUser)
+    }
+
+    localStorage.setItem('local_users', JSON.stringify(localUsers))
+    if (setToast) {
+      setToast({ type: 'success', message: `Subscription for ${targetUser.fullName || targetUser.email} renewed for +6 Months!` })
+    }
+    fetchUsers()
+  }
+
+  // Fetch users from API & LocalStorage
   useEffect(() => {
     fetchUsers()
   }, [])
@@ -873,6 +1034,7 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
           onMenuClick={() => setSidebarOpen(true)}
           theme={theme}
           setTheme={setTheme}
+          user={user}
         />
         <main className="flex-1 overflow-y-auto">
           {tabLoading ? (
@@ -881,7 +1043,7 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
             <>
               {activeTab === 'overview' && <AdminOverview users={users} theme={theme} setActiveTab={setActiveTab} />}
               {activeTab === 'connect' && <QRConnect />}
-              {activeTab === 'users' && <AdminUsersPanel users={users} setActiveTab={setActiveTab} />}
+              {activeTab === 'users' && <AdminUsersPanel users={users} setActiveTab={setActiveTab} onRenewSubscription={handleRenewSubscription} />}
               {activeTab === 'createUser' && <AdminCreateUserPanel setToast={setToast} onUserCreated={fetchUsers} />}
             </>
           )}

@@ -88,12 +88,51 @@ const SignIn = ({ setAuthUser, setToast }) => {
           navigate('/dashboard');
           setIsLoading(false);
         } else {
+          // Check local_users fallback for demo accounts
+          const localUsers = JSON.parse(localStorage.getItem('local_users') || '[]')
+          const foundLocal = localUsers.find(u => u.email?.toLowerCase() === signInData.email.toLowerCase() && u.password === signInData.password)
+          if (foundLocal) {
+            const loggedInUser = {
+              fullName: foundLocal.fullName,
+              email: foundLocal.email,
+              role: foundLocal.role || 'user',
+              subscriptionEndDate: foundLocal.subscriptionEndDate,
+              subscriptionStatus: foundLocal.subscriptionStatus,
+              token: 'demo-local-token'
+            }
+            localStorage.setItem('authToken', 'demo-local-token')
+            setAuthUser(loggedInUser)
+            setToast({ type: 'success', message: `Welcome back, ${foundLocal.fullName}!` })
+            navigate('/dashboard')
+            setIsLoading(false)
+            return
+          }
+
           const errData = await response.json().catch(() => ({}));
           const errMsg = errData.message || errData.error || 'Invalid credentials';
           throw new Error(errMsg);
         }
       } catch (apiError) {
-        console.error("API login failed:", apiError);
+        console.error("API login failed, checking local users:", apiError);
+        const localUsers = JSON.parse(localStorage.getItem('local_users') || '[]')
+        const foundLocal = localUsers.find(u => u.email?.toLowerCase() === signInData.email.toLowerCase() && u.password === signInData.password)
+        if (foundLocal) {
+          const loggedInUser = {
+            fullName: foundLocal.fullName,
+            email: foundLocal.email,
+            role: foundLocal.role || 'user',
+            subscriptionEndDate: foundLocal.subscriptionEndDate,
+            subscriptionStatus: foundLocal.subscriptionStatus,
+            token: 'demo-local-token'
+          }
+          localStorage.setItem('authToken', 'demo-local-token')
+          setAuthUser(loggedInUser)
+          setToast({ type: 'success', message: `Welcome back, ${foundLocal.fullName}!` })
+          navigate('/dashboard')
+          setIsLoading(false)
+          return
+        }
+
         setToast({ type: 'error', message: apiError.message || 'API connection failed. Please check backend.' });
         setIsLoading(false);
       }

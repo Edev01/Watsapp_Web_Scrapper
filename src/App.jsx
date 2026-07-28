@@ -102,6 +102,29 @@ function App() {
     return saved ? JSON.parse(saved) : null
   })
 
+  // Pre-seed demo expired user into LocalStorage
+  useEffect(() => {
+    const localUsers = JSON.parse(localStorage.getItem('local_users') || '[]')
+    const demoExpiredUser = {
+      fullName: 'Expired Demo User',
+      email: 'aftersubscription@gmail.com',
+      password: 'Zhsk99100$',
+      role: 'user',
+      joinedAt: '2025-01-01T00:00:00.000Z',
+      subscriptionStatus: 'expired',
+      subscriptionStartDate: '2025-01-01T00:00:00.000Z',
+      subscriptionEndDate: '2025-07-01T00:00:00.000Z'
+    }
+
+    const idx = localUsers.findIndex(u => u.email?.toLowerCase() === demoExpiredUser.email.toLowerCase())
+    if (idx !== -1) {
+      localUsers[idx] = demoExpiredUser
+    } else {
+      localUsers.push(demoExpiredUser)
+    }
+    localStorage.setItem('local_users', JSON.stringify(localUsers))
+  }, [])
+
   // Sync authUser state to localStorage
   useEffect(() => {
     if (authUser) {
