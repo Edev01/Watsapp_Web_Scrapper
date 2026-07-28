@@ -139,6 +139,7 @@ const ScrapedChats = ({ setToast }) => {
   const [error, setError] = useState('')
   const [messageError, setMessageError] = useState('')
   const [lastSyncedAt, setLastSyncedAt] = useState('')
+  const [showMobileMessages, setShowMobileMessages] = useState(false)
 
   const selectedChat = useMemo(
     () => chats.find(chat => chat.jid === selectedChatId) || null,
@@ -359,7 +360,9 @@ const ScrapedChats = ({ setToast }) => {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-5">
-        <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[600px]">
+        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${
+          showMobileMessages ? 'hidden xl:flex' : 'flex'
+        }`}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">Chats</h2>
@@ -441,11 +444,15 @@ const ScrapedChats = ({ setToast }) => {
                       key={chat.jid}
                       role="button"
                       tabIndex={0}
-                      onClick={() => setSelectedChatId(chat.jid)}
+                      onClick={() => {
+                        setSelectedChatId(chat.jid)
+                        setShowMobileMessages(true)
+                      }}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault()
                           setSelectedChatId(chat.jid)
+                          setShowMobileMessages(true)
                         }
                       }}
                       className={`w-full text-left p-4 transition-colors ${
@@ -521,27 +528,43 @@ const ScrapedChats = ({ setToast }) => {
           </div>
         </section>
 
-        <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[600px]">
-          <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-sm font-black text-slate-900 dark:text-slate-100 truncate">
-                {selectedChat ? selectedChat.name : 'Messages'}
-              </h2>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate mt-0.5">
-                {selectedChat?.jid || API_ENDPOINTS.scrapedChatMessages}
-              </p>
+        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${
+          showMobileMessages ? 'flex' : 'hidden xl:flex'
+        }`}>
+          <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setShowMobileMessages(false)}
+                className="xl:hidden p-1.5 -ml-1 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shrink-0"
+                aria-label="Back to chats"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+              </button>
+              {selectedChat && <ChatAvatar chat={selectedChat} />}
+              <div className="min-w-0">
+                <h2 className="text-sm font-black text-slate-900 dark:text-slate-100 truncate">
+                  {selectedChat ? selectedChat.name : 'Messages'}
+                </h2>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate mt-0.5">
+                  {selectedChat?.jid || API_ENDPOINTS.scrapedChatMessages}
+                </p>
+              </div>
             </div>
             {selectedChat && (
               <button
                 type="button"
                 onClick={() => loadMessages(selectedChat.jid)}
                 disabled={loadingMessages}
-                className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 text-xs font-bold hover:border-emerald-300 dark:hover:border-emerald-700 disabled:opacity-60 transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 text-xs font-bold hover:border-emerald-300 dark:hover:border-emerald-700 disabled:opacity-60 transition-colors shrink-0"
               >
                 <svg className={`w-4 h-4 ${loadingMessages ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Reload Messages
+                <span className="hidden sm:inline">Reload Messages</span>
+                <span className="sm:hidden">Reload</span>
               </button>
             )}
           </div>

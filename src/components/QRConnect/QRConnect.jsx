@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { io } from 'socket.io-client'
 import { API_ENDPOINTS } from '../../api'
 
 const API_URL = API_ENDPOINTS.qrLatest
-const POLL_INTERVAL = 5000 // 5 seconds interval (same as Vercel app)
+const SOCKET_BASE_URL = import.meta.env.VITE_SCRAPPER_URL || 'https://scrapper-node-app.onrender.com'
+const POLL_INTERVAL = 5000 // 5 seconds interval fallback
 
 const STATUS = {
   LOADING: 'loading',
   READY: 'ready',
+  CONNECTED: 'connected',
   ERROR: 'error'
 }
 
@@ -31,6 +34,7 @@ const QRConnect = () => {
   const [qrMeta, setQrMeta] = useState(null) // { createdAt, pageUrl, source }
   const [errorMsg, setErrorMsg] = useState('')
   const [lastUpdatedText, setLastUpdatedText] = useState('')
+  const [socketConnected, setSocketConnected] = useState(false)
 
   const isInitialFetch = useRef(true)
 
@@ -79,7 +83,60 @@ const QRConnect = () => {
     }
   }, [])
 
-  // Initial fetch + Auto polling every 5 seconds (matches Vercel app behavior)
+  // Socket.IO live sync for real-time QR updates
+  useEffect(() => {
+    let socket;
+    try {
+      socket = io(SOCKET_BASE_URL, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+      })
+
+      socket.on('connect', () => {
+        setSocketConnected(true)
+      })
+
+      socket.on('disconnect', () => {
+        setSocketConnected(false)
+      })
+
+      // Listen for 'new_qr' event from backend
+      socket.on('new_qr', (data) => {
+        const rawData = Array.isArray(data) ? data[0] : data
+        const qrCode = typeof rawData === 'string'
+          ? rawData
+          : (rawData?.url || rawData?.qr || rawData?.data || '')
+
+        if (qrCode) {
+          setQrData(qrCode)
+          const createdAt = rawData?.created_at || rawData?.createdAt || new Date().toISOString()
+          setQrMeta({
+            createdAt,
+            pageUrl: rawData?.page_url || rawData?.pageUrl || '',
+            source: 'WebSocket Live'
+          })
+          setLastUpdatedText(formatRelativeTime(createdAt))
+          setStatus(STATUS.READY)
+          setErrorMsg('')
+          isInitialFetch.current = false
+        }
+      })
+
+      // Listen for 'qr_disappeared' event from backend
+      socket.on('qr_disappeared', () => {
+        setQrData(null)
+        setStatus(STATUS.CONNECTED)
+      })
+    } catch (e) {
+      console.error('Socket initialization error:', e)
+    }
+
+    return () => {
+      if (socket) socket.disconnect()
+    }
+  }, [])
+
+  // Initial fetch + Auto polling every 5 seconds as fallback
   useEffect(() => {
     fetchQR(false)
 
@@ -127,8 +184,10 @@ const QRConnect = () => {
             <div className="text-center flex flex-col items-center w-full">
               {/* Live sync badge */}
               <div className="flex items-center gap-2 mb-4 px-3.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Live Sync Active</span>
+                <span className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                  {socketConnected ? 'WebSocket Live Sync' : 'Live Sync Active'}
+                </span>
               </div>
 
               {/* QR Code Container */}
@@ -157,6 +216,27 @@ const QRConnect = () => {
                   ↺ Refresh
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* CONNECTED / DISAPPEARED STATE */}
+          {status === STATUS.CONNECTED && (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center mx-auto mb-4 text-emerald-600 dark:text-emerald-400">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-base font-black text-slate-900 dark:text-slate-100 mb-1">WhatsApp Connected!</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[240px] mx-auto mb-4">
+                The QR code was scanned or linked successfully.
+              </p>
+              <button 
+                onClick={() => fetchQR(false)} 
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+              >
+                Check QR Status
+              </button>
             </div>
           )}
 
@@ -210,19 +290,20 @@ const QRConnect = () => {
             <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-3 text-sm">Connection Details</h3>
             <div className="flex items-center gap-2 mb-2">
               <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                status === STATUS.READY ? 'bg-emerald-500 animate-pulse' :
-                status === STATUS.LOADING ? 'bg-amber-400 animate-pulse' : 'bg-rose-500'
+                socketConnected ? 'bg-emerald-500 animate-pulse' :
+                status === STATUS.READY ? 'bg-amber-400 animate-pulse' : 'bg-rose-500'
               }`} />
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                {status === STATUS.LOADING && 'Connecting to scrapper...'}
-                {status === STATUS.READY && 'Syncing Live (5s interval)'}
-                {status === STATUS.ERROR && 'Offline'}
+                {socketConnected ? 'WebSocket Live Sync Active' : status === STATUS.READY ? 'Syncing via API' : 'Offline'}
               </span>
             </div>
 
             <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl space-y-1 transition-colors">
               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
                 <strong className="text-slate-700 dark:text-slate-300">Endpoint:</strong> {API_URL}
+              </p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                <strong className="text-slate-700 dark:text-slate-300">Socket:</strong> {SOCKET_BASE_URL}
               </p>
               {qrMeta?.source && (
                 <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">

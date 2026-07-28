@@ -19,10 +19,16 @@ const USER_NAV = [
 
 const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('search')
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('user_active_tab') || 'search'
+  })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [tabLoading, setTabLoading] = useState(true)
+
+  useEffect(() => {
+    localStorage.setItem('user_active_tab', activeTab)
+  }, [activeTab])
 
   const handleSearch = (appliedFilters) => {
     navigate('/results', { state: { filters: appliedFilters } })
