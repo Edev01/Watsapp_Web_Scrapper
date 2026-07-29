@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_SCRAPPER_URL;
+const BASE_URL = import.meta.env.VITE_SCRAPPER_URL || 'https://scrapper-node-app.onrender.com';
 
 export const API_ENDPOINTS = {
   adminSignup: `${BASE_URL}/api/auth/admin/signup`,
@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
   scrapedChatMessages: `${BASE_URL}/api/scraped-chats/messages`,
   scrapedChatsMonitor: `${BASE_URL}/api/scraped-chats/monitor`,
   scrapedChatsMonitored: `${BASE_URL}/api/scraped-chats/monitored`,
+  filterProperties: `${BASE_URL}/api/properties/filter`,
 };
 
 const buildHeaders = () => {
@@ -57,4 +58,11 @@ export const scrapedChatsApi = {
     }),
   }),
   getMonitoredChats: () => apiRequest(API_ENDPOINTS.scrapedChatsMonitored),
+};
+
+export const propertyApi = {
+  filterProperties: (filters) => apiRequest(API_ENDPOINTS.filterProperties, {
+    method: 'POST',
+    body: JSON.stringify({ filters }),
+  }),
 };

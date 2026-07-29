@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import PropertyFilters, { DEFAULT_FILTERS } from '../../components/PropertyFilters/PropertyFilters'
 import { CardSkeleton } from '../../components/Skeleton/Skeleton'
+import { propertyApi } from '../../api'
 
 // ── All mock data ─────────────────────────────────────────────────────────────
 const ALL_LISTINGS = [
@@ -33,7 +34,7 @@ const applyFilters = (listings, f) =>
     if (f.sortBy === 'Price: Low → High') return a.price - b.price
     if (f.sortBy === 'Price: High → Low') return b.price - a.price
     if (f.sortBy === 'Area: Small → Large') return a.area - b.area
-    if (f.sortBy === 'Area: Large → Small') return b.area - a.area
+    if (f.sortBy === 'Area: Large → Small') return a.area - b.area
     return new Date(b.scrapedAt) - new Date(a.scrapedAt)
   })
 
@@ -94,16 +95,30 @@ const Results = () => {
   const [committed, setCommitted] = useState(initialFilters) // filters actually applied to results
   const [viewMode, setViewMode] = useState('grid')
   const [loading, setLoading] = useState(true)
+  const [apiProperties, setApiProperties] = useState([])
 
   useEffect(() => {
     setLoading(true)
-    const timer = setTimeout(() => {
-      setLoading(false)
-    }, 1000)
-    return () => clearTimeout(timer)
+    console.log('🚀 Sending filter payload to API:', committed)
+    propertyApi.filterProperties(committed)
+      .then(res => {
+        console.log('📢 API Property Filter Response Received:', res)
+        if (res?.data?.properties && Array.isArray(res.data.properties)) {
+          setApiProperties(res.data.properties)
+        } else {
+          setApiProperties([])
+        }
+      })
+      .catch(err => {
+        console.error('❌ API Filter Request Error:', err)
+        setApiProperties([])
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }, [committed])
 
-  const results = applyFilters(ALL_LISTINGS, committed)
+  const results = apiProperties.length > 0 ? apiProperties : applyFilters(ALL_LISTINGS, committed)
 
   const handleSearch = (newFilters) => {
     setCommitted(newFilters)

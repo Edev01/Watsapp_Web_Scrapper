@@ -56,11 +56,11 @@ const normalizeMessage = (message = {}, index) => {
     senderName: message.senderName || message.notifyName || message.pushName || message._data?.notifyName || from || 'Unknown sender',
     type: message.type || message.messageType || message._data?.type || 'message',
     fromMe: Boolean(
-      message.fromMe ?? 
-      message.from_me ?? 
-      message.isFromMe ?? 
-      message.id?.fromMe ?? 
-      message.key?.fromMe ?? 
+      message.fromMe ??
+      message.from_me ??
+      message.isFromMe ??
+      message.id?.fromMe ??
+      message.key?.fromMe ??
       (typeof id === 'string' && id.startsWith('true_'))
     ),
     createdAt: normalizeDate(message.created_at || message.createdAt || message.timestamp || message.t),
@@ -360,9 +360,8 @@ const ScrapedChats = ({ setToast }) => {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-5">
-        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${
-          showMobileMessages ? 'hidden xl:flex' : 'flex'
-        }`}>
+        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${showMobileMessages ? 'hidden xl:flex' : 'flex'
+          }`}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">Chats</h2>
@@ -377,11 +376,10 @@ const ScrapedChats = ({ setToast }) => {
                   key={item.id}
                   type="button"
                   onClick={() => setChatFilter(item.id)}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
-                    chatFilter === item.id
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${chatFilter === item.id
                       ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-sm'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </button>
@@ -396,11 +394,10 @@ const ScrapedChats = ({ setToast }) => {
               disabled={selectableVisibleChats.length === 0}
               className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <span className={`w-4 h-4 rounded border flex items-center justify-center ${
-                allVisibleSelected
+              <span className={`w-4 h-4 rounded border flex items-center justify-center ${allVisibleSelected
                   ? 'bg-emerald-600 border-emerald-600 text-white'
                   : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
-              }`}>
+                }`}>
                 {allVisibleSelected && (
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -455,11 +452,10 @@ const ScrapedChats = ({ setToast }) => {
                           setShowMobileMessages(true)
                         }
                       }}
-                      className={`w-full text-left p-4 transition-colors ${
-                        isSelected
+                      className={`w-full text-left p-4 transition-colors ${isSelected
                           ? 'bg-emerald-50 dark:bg-emerald-950/30'
                           : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start gap-3">
                         <button
@@ -469,13 +465,12 @@ const ScrapedChats = ({ setToast }) => {
                             event.stopPropagation()
                             toggleChatSelection(chat)
                           }}
-                          className={`mt-2 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                            isChecked
+                          className={`mt-2 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${isChecked
                               ? 'bg-emerald-600 border-emerald-600 text-white'
                               : chat.isMonitored || isMonitoring
                                 ? 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-500 cursor-not-allowed'
                                 : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 hover:border-emerald-500'
-                          }`}
+                            }`}
                           aria-label={chat.isMonitored ? 'Already monitored' : `Select ${chat.name}`}
                         >
                           {isChecked && (
@@ -491,24 +486,22 @@ const ScrapedChats = ({ setToast }) => {
                               <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{chat.name}</p>
                               <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate mt-0.5">{chat.jid}</p>
                             </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                              chat.isMonitored
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${chat.isMonitored
                                 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                                 : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
-                            }`}>
+                              }`}>
                               {chat.isMonitored ? 'Monitored' : 'New'}
                             </span>
                           </div>
 
                           <div className="mt-3 flex items-center justify-between gap-3">
                             <p className="text-[11px] text-slate-400 dark:text-slate-500">{formatDateTime(chat.createdAt)}</p>
-                            <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold ${
-                              chat.isMonitored
+                            <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold ${chat.isMonitored
                                 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                                 : isChecked
                                   ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
                                   : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
-                            }`}>
+                              }`}>
                               {isMonitoring && (
                                 <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
@@ -528,9 +521,8 @@ const ScrapedChats = ({ setToast }) => {
           </div>
         </section>
 
-        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${
-          showMobileMessages ? 'flex' : 'hidden xl:flex'
-        }`}>
+        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${showMobileMessages ? 'flex' : 'hidden xl:flex'
+          }`}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <button
@@ -594,11 +586,10 @@ const ScrapedChats = ({ setToast }) => {
               <div className="space-y-3">
                 {messages.map(message => (
                   <div key={message.id} className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[86%] rounded-2xl border p-3 shadow-sm ${
-                      message.fromMe
+                    <div className={`max-w-[86%] rounded-2xl border p-3 shadow-sm ${message.fromMe
                         ? 'bg-emerald-600 border-emerald-600 text-white'
                         : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
-                    }`}>
+                      }`}>
                       <div className="flex items-center justify-between gap-4 mb-1.5">
                         <p className={`text-[10px] font-bold truncate ${message.fromMe ? 'text-emerald-50' : 'text-slate-500 dark:text-slate-400'}`}>
                           {message.fromMe ? 'You' : message.senderName}
