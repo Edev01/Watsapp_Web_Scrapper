@@ -57,6 +57,14 @@ export const scrapedChatsApi = {
       jids: Array.isArray(jids) ? jids : [jids],
     }),
   }),
+  unmonitorChats: (jids) => apiRequest(API_ENDPOINTS.scrapedChatsMonitor, {
+    method: 'POST',
+    body: JSON.stringify({
+      jids: Array.isArray(jids) ? jids : [jids],
+      action: 'unmonitor',
+      isMonitored: false,
+    }),
+  }),
   getMonitoredChats: () => apiRequest(API_ENDPOINTS.scrapedChatsMonitored),
 };
 
