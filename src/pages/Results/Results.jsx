@@ -161,102 +161,98 @@ const PropertyCard = ({ p, onSelect }) => (
 // 💀 Table Skeleton Loading Component
 const TableSkeleton = () => (
   <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden animate-pulse">
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700">
-          <tr>
-            <th className="px-5 py-4 w-32"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" /></th>
-            <th className="px-5 py-4 w-48"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" /></th>
-            <th className="px-5 py-4 w-44"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" /></th>
-            <th className="px-5 py-4 w-44"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" /></th>
-            <th className="px-5 py-4 w-48"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-28" /></th>
+    <table className="w-full table-fixed text-left text-xs">
+      <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700">
+        <tr>
+          <th className="px-4 py-3.5 w-[14%] sm:w-[12%]"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-14" /></th>
+          <th className="px-4 py-3.5 w-[26%] sm:w-[26%]"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" /></th>
+          <th className="px-4 py-3.5 w-[18%] sm:w-[18%]"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" /></th>
+          <th className="px-4 py-3.5 w-[20%] sm:w-[20%]"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" /></th>
+          <th className="px-4 py-3.5 w-[22%] sm:w-[24%]"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" /></th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100 dark:divide-slate-700/70">
+        {[...Array(6)].map((_, i) => (
+          <tr key={i}>
+            <td className="px-4 py-3.5"><div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded-full" /></td>
+            <td className="px-4 py-3.5"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-24" /></td>
+            <td className="px-4 py-3.5"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-20" /></td>
+            <td className="px-4 py-3.5"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-20" /></td>
+            <td className="px-4 py-3.5"><div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-28" /></td>
           </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/70">
-          {[...Array(6)].map((_, i) => (
-            <tr key={i}>
-              <td className="px-5 py-4"><div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded-full" /></td>
-              <td className="px-5 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-28" /></td>
-              <td className="px-5 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-24" /></td>
-              <td className="px-5 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-24" /></td>
-              <td className="px-5 py-4"><div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-28" /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </table>
   </div>
 )
 
-// 📊 Table Component for Row View:
-// - Property: Only Property Type (House, Apartment, Plot, Commercial, etc.)
-// - Location: Only City (Karachi, Lahore, Islamabad, etc.)
-// - All other details (size, sub-type, detailed area) open in Side Drawer!
+// 📊 Table Component for Row View (table-fixed 100% width, No horizontal scroll!)
 const PropertyTable = ({ properties, onSelect }) => (
   <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
-        <thead className="bg-slate-50 dark:bg-slate-900/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider border-b border-slate-200 dark:border-slate-700">
-          <tr>
-            <th scope="col" className="px-5 py-4 w-32">Status</th>
-            <th scope="col" className="px-5 py-4 w-48">Property</th>
-            <th scope="col" className="px-5 py-4 w-44">Location</th>
-            <th scope="col" className="px-5 py-4 w-44">Price</th>
-            <th scope="col" className="px-5 py-4 w-48">Contact Number</th>
+    <table className="w-full table-fixed text-left text-xs text-slate-600 dark:text-slate-300">
+      <thead className="bg-slate-50 dark:bg-slate-900/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider border-b border-slate-200 dark:border-slate-700">
+        <tr>
+          <th scope="col" className="px-4 py-3.5 w-[14%] sm:w-[12%]">Status</th>
+          <th scope="col" className="px-4 py-3.5 w-[26%] sm:w-[26%]">Property</th>
+          <th scope="col" className="px-4 py-3.5 w-[18%] sm:w-[18%]">Location</th>
+          <th scope="col" className="px-4 py-3.5 w-[20%] sm:w-[20%]">Price</th>
+          <th scope="col" className="px-4 py-3.5 w-[22%] sm:w-[24%]">Contact Number</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100 dark:divide-slate-700/70">
+        {properties.map((p) => (
+          <tr
+            key={p.id}
+            onClick={() => onSelect(p)}
+            className="hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer group"
+          >
+            {/* Rent / Sale */}
+            <td className="px-4 py-3.5 whitespace-nowrap">
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full inline-block ${p.purpose === 'Buy' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'}`}>
+                For {p.purpose}
+              </span>
+            </td>
+
+            {/* Property: ONLY Property Type (Line clamped & truncated) */}
+            <td className="px-4 py-3.5 overflow-hidden">
+              <span
+                title={p.type || 'Property'}
+                className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors block truncate"
+              >
+                {p.type || 'Property'}
+              </span>
+            </td>
+
+            {/* Location: ONLY City */}
+            <td className="px-4 py-3.5 overflow-hidden whitespace-nowrap">
+              <div className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-semibold text-xs truncate">
+                <span className="text-emerald-500 shrink-0">📍</span>
+                <span className="truncate" title={p.city || 'Unknown'}>{p.city || 'Unknown'}</span>
+              </div>
+            </td>
+
+            {/* Price */}
+            <td className="px-4 py-3.5 whitespace-nowrap overflow-hidden">
+              <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm block truncate">
+                {formatPrice(p.price, p.purpose, p.priceFormatted)}
+              </span>
+            </td>
+
+            {/* Contact */}
+            <td className="px-4 py-3.5 whitespace-nowrap overflow-hidden">
+              {p.phone ? (
+                <span className="font-mono text-slate-800 dark:text-slate-200 text-[11px] sm:text-xs font-bold bg-slate-100 dark:bg-slate-700/60 px-2 sm:px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-600 inline-flex items-center gap-1 max-w-full truncate">
+                  <span className="shrink-0">📞</span>
+                  <span className="truncate">{p.phone}</span>
+                </span>
+              ) : (
+                <span className="text-slate-400 text-xs italic">Not provided</span>
+              )}
+            </td>
           </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/70">
-          {properties.map((p) => (
-            <tr
-              key={p.id}
-              onClick={() => onSelect(p)}
-              className="hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer group"
-            >
-              {/* Rent / Sale */}
-              <td className="px-5 py-4 whitespace-nowrap">
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${p.purpose === 'Buy' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'}`}>
-                  For {p.purpose}
-                </span>
-              </td>
-
-              {/* Property: ONLY Property Type (e.g. House, Apartment, Plot) */}
-              <td className="px-5 py-4 whitespace-nowrap">
-                <span className="font-bold text-slate-900 dark:text-slate-100 text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                  {p.type || 'Property'}
-                </span>
-              </td>
-
-              {/* Location: ONLY City (e.g. Karachi, Lahore, Islamabad) */}
-              <td className="px-5 py-4 whitespace-nowrap">
-                <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-semibold text-xs">
-                  <span className="text-emerald-500 shrink-0">📍</span>
-                  <span>{p.city || 'Unknown'}</span>
-                </div>
-              </td>
-
-              {/* Price */}
-              <td className="px-5 py-4 whitespace-nowrap">
-                <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-base">
-                  {formatPrice(p.price, p.purpose, p.priceFormatted)}
-                </span>
-              </td>
-
-              {/* Contact */}
-              <td className="px-5 py-4 whitespace-nowrap">
-                {p.phone ? (
-                  <span className="font-mono text-slate-800 dark:text-slate-200 text-xs font-bold bg-slate-100 dark:bg-slate-700/60 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-600 inline-flex items-center gap-1.5">
-                    <span>📞</span>
-                    <span>{p.phone}</span>
-                  </span>
-                ) : (
-                  <span className="text-slate-400 text-xs italic">Not provided</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </table>
   </div>
 )
 
