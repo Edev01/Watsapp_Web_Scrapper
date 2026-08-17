@@ -29,7 +29,7 @@ const normalizeMLResult = (item, index) => {
     subType: item.property_sub_type || '',
     purpose,
     city: item.city || '',
-    location: location || 'Unknown',
+    location: location || item.city || 'Unknown',
     areaName: item.area || '',
     vicinity: item.vicinity || '',
     currency: 'PKR',
@@ -166,8 +166,8 @@ const TableSkeleton = () => (
         <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700">
           <tr>
             <th className="px-5 py-4 w-32"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" /></th>
-            <th className="px-5 py-4"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" /></th>
-            <th className="px-5 py-4"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" /></th>
+            <th className="px-5 py-4 w-48"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" /></th>
+            <th className="px-5 py-4 w-44"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" /></th>
             <th className="px-5 py-4 w-44"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" /></th>
             <th className="px-5 py-4 w-48"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-28" /></th>
           </tr>
@@ -176,14 +176,8 @@ const TableSkeleton = () => (
           {[...Array(6)].map((_, i) => (
             <tr key={i}>
               <td className="px-5 py-4"><div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded-full" /></td>
-              <td className="px-5 py-4 space-y-2">
-                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-48" />
-                <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded w-28" />
-              </td>
-              <td className="px-5 py-4 space-y-1.5">
-                <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-36" />
-                <div className="h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded w-20" />
-              </td>
+              <td className="px-5 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-28" /></td>
+              <td className="px-5 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-24" /></td>
               <td className="px-5 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-24" /></td>
               <td className="px-5 py-4"><div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-28" /></td>
             </tr>
@@ -194,7 +188,10 @@ const TableSkeleton = () => (
   </div>
 )
 
-// 📊 Table Component for Row View (Status, Property, Location, Price, Contact)
+// 📊 Table Component for Row View:
+// - Property: Only Property Type (House, Apartment, Plot, Commercial, etc.)
+// - Location: Only City (Karachi, Lahore, Islamabad, etc.)
+// - All other details (size, sub-type, detailed area) open in Side Drawer!
 const PropertyTable = ({ properties, onSelect }) => (
   <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
     <div className="overflow-x-auto">
@@ -202,8 +199,8 @@ const PropertyTable = ({ properties, onSelect }) => (
         <thead className="bg-slate-50 dark:bg-slate-900/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider border-b border-slate-200 dark:border-slate-700">
           <tr>
             <th scope="col" className="px-5 py-4 w-32">Status</th>
-            <th scope="col" className="px-5 py-4">Property</th>
-            <th scope="col" className="px-5 py-4">Location</th>
+            <th scope="col" className="px-5 py-4 w-48">Property</th>
+            <th scope="col" className="px-5 py-4 w-44">Location</th>
             <th scope="col" className="px-5 py-4 w-44">Price</th>
             <th scope="col" className="px-5 py-4 w-48">Contact Number</th>
           </tr>
@@ -222,25 +219,19 @@ const PropertyTable = ({ properties, onSelect }) => (
                 </span>
               </td>
 
-              {/* Property Title & Specs */}
-              <td className="px-5 py-4">
-                <p className="font-bold text-slate-900 dark:text-slate-100 text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                  {p.title}
-                </p>
-                <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-                  <span className="font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/60 px-1.5 py-0.5 rounded">{p.type}</span>
-                  {p.area > 0 && <span>• {p.area} {p.areaUnit}</span>}
-                  {p.subType && <span>• {p.subType}</span>}
-                </div>
+              {/* Property: ONLY Property Type (e.g. House, Apartment, Plot) */}
+              <td className="px-5 py-4 whitespace-nowrap">
+                <span className="font-bold text-slate-900 dark:text-slate-100 text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                  {p.type || 'Property'}
+                </span>
               </td>
 
-              {/* Location */}
-              <td className="px-5 py-4">
-                <div className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-medium">
-                  <span className="text-slate-400 shrink-0">📍</span>
-                  <span>{p.location || 'Unknown'}</span>
+              {/* Location: ONLY City (e.g. Karachi, Lahore, Islamabad) */}
+              <td className="px-5 py-4 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-semibold text-xs">
+                  <span className="text-emerald-500 shrink-0">📍</span>
+                  <span>{p.city || 'Unknown'}</span>
                 </div>
-                {p.city && <p className="text-[11px] text-slate-400 dark:text-slate-500 ml-4 mt-0.5">{p.city}</p>}
               </td>
 
               {/* Price */}
@@ -269,7 +260,7 @@ const PropertyTable = ({ properties, onSelect }) => (
   </div>
 )
 
-// 🪟 Ultra-Smooth Framer-Motion Animated Side Drawer
+// 🪟 Ultra-Smooth Framer-Motion Animated Side Drawer (Full Details: Title, Size, SubType, Detailed Area, Full Address)
 const PropertyDrawer = ({ property, onClose }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -326,6 +317,7 @@ const PropertyDrawer = ({ property, onClose }) => {
                       </span>
                     )}
                   </div>
+                  {/* Detailed Title / Size & Subtype */}
                   <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 leading-snug">
                     {property.title}
                   </h2>
@@ -356,28 +348,28 @@ const PropertyDrawer = ({ property, onClose }) => {
                   </p>
                 </div>
 
-                {/* Quick Specs Grid */}
+                {/* Complete Detailed Specs Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Type</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Property Type</p>
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.type || 'N/A'}</p>
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Size</p>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">
-                      {property.area > 0 ? `${property.area} ${property.areaUnit}` : 'N/A'}
-                    </p>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Property Sub-Type</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.subType || 'Standard'}</p>
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Sub-Type</p>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.subType || 'Standard'}</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Area / Size</p>
+                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      {property.area > 0 ? `${property.area} ${property.areaUnit}` : 'N/A'}
+                    </p>
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
                     <p className="text-[10px] font-bold uppercase text-slate-400">City</p>
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.city || 'N/A'}</p>
                   </div>
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700 col-span-2">
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Location Details</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Area / Sector / Vicinity</p>
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">{property.location || 'N/A'}</p>
                   </div>
                 </div>
