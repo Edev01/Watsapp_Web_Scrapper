@@ -5,6 +5,8 @@ import PropertyFilters, { DEFAULT_FILTERS } from '../../components/PropertyFilte
 import { CardSkeleton } from '../../components/Skeleton/Skeleton'
 import { mlSearchApi } from '../../api'
 
+const ITEMS_PER_PAGE = 20
+
 // 🔄 Map ML API response item to normalized property object
 const normalizeMLResult = (item, index) => {
   const purposeMap = { SALE: 'Buy', RENT: 'Rent', BUY: 'Buy' }
@@ -256,6 +258,90 @@ const PropertyTable = ({ properties, onSelect }) => (
   </div>
 )
 
+// 📄 Pagination Component (Prev, 1, 2, 3, 4 ... Next)
+const Pagination = ({ currentPage, totalPages, totalItems, itemsPerPage, onPageChange }) => {
+  if (totalPages <= 1) return null
+
+  const startItem = (currentPage - 1) * itemsPerPage + 1
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems)
+
+  const getPageNumbers = () => {
+    const pages = []
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+    } else {
+      if (currentPage <= 4) {
+        pages.push(1, 2, 3, 4, 5, '...', totalPages)
+      } else if (currentPage >= totalPages - 3) {
+        pages.push(1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages)
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages)
+      }
+    }
+    return pages
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+        Showing <span className="font-bold text-slate-800 dark:text-slate-200">{startItem}</span> to{' '}
+        <span className="font-bold text-slate-800 dark:text-slate-200">{endItem}</span> of{' '}
+        <span className="font-bold text-slate-800 dark:text-slate-200">{totalItems}</span> properties
+      </p>
+
+      <div className="flex items-center gap-1.5 self-center sm:self-auto flex-wrap">
+        {/* Prev Button */}
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all inline-flex items-center gap-1 cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Prev</span>
+        </button>
+
+        {/* Page Buttons */}
+        {getPageNumbers().map((page, idx) =>
+          page === '...' ? (
+            <span key={`dots-${idx}`} className="px-1 text-xs font-bold text-slate-400">
+              ...
+            </span>
+          ) : (
+            <button
+              key={page}
+              type="button"
+              onClick={() => onPageChange(page)}
+              className={`min-w-[34px] h-[34px] rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                currentPage === page
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
+            >
+              {page}
+            </button>
+          )
+        )}
+
+        {/* Next Button */}
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all inline-flex items-center gap-1 cursor-pointer"
+        >
+          <span>Next</span>
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // 🪟 Ultra-Smooth Framer-Motion Animated Side Drawer (Full Details: Title, Size, SubType, Detailed Area, Full Address)
 const PropertyDrawer = ({ property, onClose }) => {
   useEffect(() => {
@@ -484,11 +570,13 @@ const Results = () => {
   const [results, setResults] = useState([])
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('') // Live search query state
+  const [currentPage, setCurrentPage] = useState(1) // Pagination state
   const [selectedProperty, setSelectedProperty] = useState(null) // Drawer state
 
   useEffect(() => {
     setLoading(true)
     setError('')
+    setCurrentPage(1)
     console.log('Sending filters to ML API:', committed)
     mlSearchApi.dashboardSearch(committed)
       .then(res => {
@@ -508,6 +596,11 @@ const Results = () => {
         setLoading(false)
       })
   }, [committed])
+
+  // Reset to page 1 on live search change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
 
   // 🔍 Real-time Live Filter on Results
   const filteredResults = useMemo(() => {
@@ -529,6 +622,20 @@ const Results = () => {
       )
     })
   }, [results, searchTerm])
+
+  // 📄 Pagination Calculations (20 items per page)
+  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE) || 1
+  const paginatedResults = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredResults.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredResults, currentPage])
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage)
+      window.scrollTo({ top: 180, behavior: 'smooth' })
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 transition-colors pb-12">
@@ -726,13 +833,31 @@ const Results = () => {
             )}
           </div>
         ) : viewMode === 'list' ? (
-          <PropertyTable properties={filteredResults} onSelect={setSelectedProperty} />
+          <>
+            <PropertyTable properties={paginatedResults} onSelect={setSelectedProperty} />
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredResults.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={handlePageChange}
+            />
+          </>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredResults.map((p) => (
-              <PropertyCard key={p.id} p={p} onSelect={setSelectedProperty} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {paginatedResults.map((p) => (
+                <PropertyCard key={p.id} p={p} onSelect={setSelectedProperty} />
+              ))}
+            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredResults.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={handlePageChange}
+            />
+          </>
         )}
       </div>
 
