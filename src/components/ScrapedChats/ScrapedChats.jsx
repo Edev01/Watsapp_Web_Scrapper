@@ -32,6 +32,32 @@ const normalizeChat = (chat = {}) => ({
   createdAt: normalizeDate(chat.created_at || chat.createdAt || chat.updated_at || chat.updatedAt),
 })
 
+const getCurrentUserTokens = () => {
+  const tokens = new Set()
+  try {
+    const saved = localStorage.getItem('currentUser')
+    if (saved) {
+      const user = JSON.parse(saved)
+      const fullName = String(user?.fullName || user?.name || user?.username || '').toLowerCase().trim()
+      const email = String(user?.email || '').toLowerCase().trim()
+      const emailPrefix = email.split('@')[0]
+
+      if (fullName) {
+        tokens.add(fullName)
+        fullName.split(/\s+/).forEach(part => {
+          if (part.length >= 3 && part !== 'user' && part !== 'standard' && part !== 'admin') {
+            tokens.add(part)
+          }
+        })
+      }
+      if (emailPrefix && emailPrefix.length >= 3) {
+        tokens.add(emailPrefix)
+      }
+    }
+  } catch {}
+  return tokens
+}
+
 const normalizeMessage = (message = {}, index) => {
   const id = typeof message.id === 'object'
     ? message.id?._serialized || message.id?.id
@@ -47,22 +73,38 @@ const normalizeMessage = (message = {}, index) => {
 
   const from = message.from || message.author || message.sender || message._data?.from || ''
   const to = message.to || message.recipient || message._data?.to || ''
+  const senderName = message.senderName || message.sender || message.notifyName || message.pushName || message._data?.notifyName || from || 'Unknown sender'
+
+  const explicitFromMe = message.fromMe ?? message.from_me ?? message.isFromMe ?? message.id?.fromMe ?? message.key?.fromMe
+
+  const userTokens = getCurrentUserTokens()
+  const cleanSender = String(senderName || '').toLowerCase().trim()
+
+  let fromMe = false
+
+  if (explicitFromMe === true || explicitFromMe === 'true') {
+    fromMe = true
+  } else if (typeof id === 'string' && id.startsWith('true_')) {
+    fromMe = true
+  } else if (cleanSender === 'you' || cleanSender === 'me' || cleanSender === 'self') {
+    fromMe = true
+  } else if (userTokens.size > 0 && cleanSender) {
+    for (const token of userTokens) {
+      if (cleanSender.includes(token) || token.includes(cleanSender)) {
+        fromMe = true
+        break
+      }
+    }
+  }
 
   return {
     id: id || `${from || to || 'message'}-${message.timestamp || index}`,
     body: String(body || ''),
     from,
     to,
-    senderName: message.senderName || message.notifyName || message.pushName || message._data?.notifyName || from || 'Unknown sender',
+    senderName,
     type: message.type || message.messageType || message._data?.type || 'message',
-    fromMe: Boolean(
-      message.fromMe ?? 
-      message.from_me ?? 
-      message.isFromMe ?? 
-      message.id?.fromMe ?? 
-      message.key?.fromMe ?? 
-      (typeof id === 'string' && id.startsWith('true_'))
-    ),
+    fromMe,
     createdAt: normalizeDate(message.created_at || message.createdAt || message.timestamp || message.t),
   }
 }
@@ -170,13 +212,18 @@ const ScrapedChats = ({ setToast }) => {
     ))
   }, [chatFilter, chats, searchTerm])
 
-  const selectableVisibleChats = useMemo(
-    () => visibleChats.filter(chat => !chat.isMonitored),
-    [visibleChats]
+  const selectedUnmonitoredJids = useMemo(
+    () => selectedJids.filter(id => chats.some(chat => chat.jid === id && !chat.isMonitored)),
+    [selectedJids, chats]
   )
 
-  const allVisibleSelected = selectableVisibleChats.length > 0
-    && selectableVisibleChats.every(chat => selectedJidSet.has(chat.jid))
+  const selectedMonitoredJids = useMemo(
+    () => selectedJids.filter(id => chats.some(chat => chat.jid === id && chat.isMonitored)),
+    [selectedJids, chats]
+  )
+
+  const allVisibleSelected = visibleChats.length > 0
+    && visibleChats.every(chat => selectedJidSet.has(chat.jid))
 
   const loadChats = useCallback(async () => {
     setLoadingChats(true)
@@ -210,7 +257,7 @@ const ScrapedChats = ({ setToast }) => {
 
     setChats(mergedChats)
     setLastSyncedAt(new Date().toISOString())
-    setSelectedJids(prev => prev.filter(id => mergedChats.some(chat => chat.jid === id && !chat.isMonitored)))
+    setSelectedJids(prev => prev.filter(id => mergedChats.some(chat => chat.jid === id)))
 
     if (allChatsResult.status === 'rejected' && monitoredResult.status === 'rejected') {
       setError(allChatsResult.reason?.message || 'Failed to load scraped chats')
@@ -254,7 +301,7 @@ const ScrapedChats = ({ setToast }) => {
   }, [loadMessages, selectedChatId])
 
   const toggleChatSelection = (chat) => {
-    if (!chat?.jid || chat.isMonitored || monitoringIds.includes(chat.jid)) return
+    if (!chat?.jid || monitoringIds.includes(chat.jid)) return
 
     setSelectedJids(prev => (
       prev.includes(chat.jid)
@@ -264,7 +311,7 @@ const ScrapedChats = ({ setToast }) => {
   }
 
   const toggleVisibleSelection = () => {
-    const visibleIds = selectableVisibleChats.map(chat => chat.jid)
+    const visibleIds = visibleChats.map(chat => chat.jid)
     if (visibleIds.length === 0) return
 
     setSelectedJids(prev => {
@@ -277,20 +324,43 @@ const ScrapedChats = ({ setToast }) => {
   }
 
   const handleMonitorSelected = async () => {
-    const jidsToMonitor = selectedJids.filter(id => chats.some(chat => chat.jid === id && !chat.isMonitored))
-    if (jidsToMonitor.length === 0) return
+    if (selectedUnmonitoredJids.length === 0) return
 
-    setMonitoringIds(prev => Array.from(new Set([...prev, ...jidsToMonitor])))
+    setMonitoringIds(prev => Array.from(new Set([...prev, ...selectedUnmonitoredJids])))
 
     try {
-      await scrapedChatsApi.monitorChats(jidsToMonitor)
-      setToast?.({ type: 'success', message: `${jidsToMonitor.length} chat${jidsToMonitor.length > 1 ? 's' : ''} added to monitored chats` })
-      setSelectedJids([])
+      await scrapedChatsApi.monitorChats(selectedUnmonitoredJids)
+      setToast?.({ type: 'success', message: `${selectedUnmonitoredJids.length} chat${selectedUnmonitoredJids.length > 1 ? 's' : ''} added to monitored chats` })
+      setSelectedJids(prev => prev.filter(id => !selectedUnmonitoredJids.includes(id)))
       await loadChats()
     } catch (err) {
       setToast?.({ type: 'error', message: err.message || 'Failed to monitor selected chats' })
     } finally {
-      setMonitoringIds(prev => prev.filter(id => !jidsToMonitor.includes(id)))
+      setMonitoringIds(prev => prev.filter(id => !selectedUnmonitoredJids.includes(id)))
+    }
+  }
+
+  const handleUnmonitorSelected = async () => {
+    if (selectedMonitoredJids.length === 0) return
+
+    const jidsToUnmonitor = [...selectedMonitoredJids]
+    setMonitoringIds(prev => Array.from(new Set([...prev, ...jidsToUnmonitor])))
+
+    // Optimistic update
+    setChats(prev => prev.map(chat => (
+      jidsToUnmonitor.includes(chat.jid) ? { ...chat, isMonitored: false } : chat
+    )))
+
+    try {
+      await scrapedChatsApi.unmonitorChats(jidsToUnmonitor)
+      setToast?.({ type: 'success', message: `${jidsToUnmonitor.length} chat${jidsToUnmonitor.length > 1 ? 's' : ''} unmonitored successfully` })
+      setSelectedJids(prev => prev.filter(id => !jidsToUnmonitor.includes(id)))
+      await loadChats()
+    } catch (err) {
+      await loadChats()
+      setToast?.({ type: 'error', message: err.message || 'Failed to unmonitor selected chats' })
+    } finally {
+      setMonitoringIds(prev => prev.filter(id => !jidsToUnmonitor.includes(id)))
     }
   }
 
@@ -305,32 +375,33 @@ const ScrapedChats = ({ setToast }) => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-          <div className="relative w-full sm:w-72">
-            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="w-4 h-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          {selectedMonitoredJids.length > 0 && (
+            <button
+              type="button"
+              onClick={handleUnmonitorSelected}
+              disabled={monitoringIds.length > 0}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg className={`w-4 h-4 ${monitoringIds.length > 0 ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-            </span>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={event => setSearchTerm(event.target.value)}
-              placeholder="Search chats..."
-              className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
-            />
-          </div>
+              Unmonitor Selected ({selectedMonitoredJids.length})
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={handleMonitorSelected}
-            disabled={selectedJids.length === 0 || monitoringIds.length > 0}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg className={`w-4 h-4 ${monitoringIds.length > 0 && selectedJids.length > 0 ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Monitor Selected ({selectedJids.length})
-          </button>
+          {selectedUnmonitoredJids.length > 0 && (
+            <button
+              type="button"
+              onClick={handleMonitorSelected}
+              disabled={monitoringIds.length > 0}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg className={`w-4 h-4 ${monitoringIds.length > 0 ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Monitor Selected ({selectedUnmonitoredJids.length})
+            </button>
+          )}
 
           <button
             type="button"
@@ -360,9 +431,8 @@ const ScrapedChats = ({ setToast }) => {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-5">
-        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${
-          showMobileMessages ? 'hidden xl:flex' : 'flex'
-        }`}>
+        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${showMobileMessages ? 'hidden xl:flex' : 'flex'
+          }`}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">Chats</h2>
@@ -377,11 +447,10 @@ const ScrapedChats = ({ setToast }) => {
                   key={item.id}
                   type="button"
                   onClick={() => setChatFilter(item.id)}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
-                    chatFilter === item.id
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${chatFilter === item.id
                       ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-sm'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </button>
@@ -389,18 +458,35 @@ const ScrapedChats = ({ setToast }) => {
             </div>
           </div>
 
+          {/* Search Bar inside Chats section */}
+          <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <div className="relative w-full">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="w-4 h-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                placeholder="Search chats..."
+                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
+              />
+            </div>
+          </div>
+
           <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/35">
             <button
               type="button"
               onClick={toggleVisibleSelection}
-              disabled={selectableVisibleChats.length === 0}
+              disabled={visibleChats.length === 0}
               className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <span className={`w-4 h-4 rounded border flex items-center justify-center ${
-                allVisibleSelected
+              <span className={`w-4 h-4 rounded border flex items-center justify-center ${allVisibleSelected
                   ? 'bg-emerald-600 border-emerald-600 text-white'
                   : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
-              }`}>
+                }`}>
                 {allVisibleSelected && (
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -410,7 +496,7 @@ const ScrapedChats = ({ setToast }) => {
               {allVisibleSelected ? 'Unselect visible' : 'Select visible'}
             </button>
             <p className="text-[11px] text-slate-400 dark:text-slate-500">
-              {selectableVisibleChats.length} available for monitor
+              {visibleChats.length} visible chats
             </p>
           </div>
 
@@ -455,28 +541,26 @@ const ScrapedChats = ({ setToast }) => {
                           setShowMobileMessages(true)
                         }
                       }}
-                      className={`w-full text-left p-4 transition-colors ${
-                        isSelected
+                      className={`w-full text-left p-4 transition-colors ${isSelected
                           ? 'bg-emerald-50 dark:bg-emerald-950/30'
                           : 'hover:bg-slate-50 dark:hover:bg-slate-700/40'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start gap-3">
                         <button
                           type="button"
-                          disabled={chat.isMonitored || isMonitoring}
+                          disabled={isMonitoring}
                           onClick={(event) => {
                             event.stopPropagation()
                             toggleChatSelection(chat)
                           }}
-                          className={`mt-2 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                            isChecked
-                              ? 'bg-emerald-600 border-emerald-600 text-white'
-                              : chat.isMonitored || isMonitoring
-                                ? 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-500 cursor-not-allowed'
-                                : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 hover:border-emerald-500'
-                          }`}
-                          aria-label={chat.isMonitored ? 'Already monitored' : `Select ${chat.name}`}
+                          className={`mt-2 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${isChecked
+                              ? chat.isMonitored
+                                ? 'bg-rose-600 border-rose-600 text-white'
+                                : 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 hover:border-emerald-500'
+                            }`}
+                          aria-label={`Select ${chat.name}`}
                         >
                           {isChecked && (
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -491,31 +575,33 @@ const ScrapedChats = ({ setToast }) => {
                               <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{chat.name}</p>
                               <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate mt-0.5">{chat.jid}</p>
                             </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                              chat.isMonitored
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${chat.isMonitored
                                 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                                 : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
-                            }`}>
+                              }`}>
                               {chat.isMonitored ? 'Monitored' : 'New'}
                             </span>
                           </div>
 
                           <div className="mt-3 flex items-center justify-between gap-3">
                             <p className="text-[11px] text-slate-400 dark:text-slate-500">{formatDateTime(chat.createdAt)}</p>
-                            <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold ${
-                              chat.isMonitored
-                                ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                                : isChecked
-                                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                            <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold ${isChecked
+                                ? chat.isMonitored
+                                  ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                                : chat.isMonitored
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                                   : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
-                            }`}>
+                              }`}>
                               {isMonitoring && (
                                 <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
                               )}
-                              {chat.isMonitored ? 'Added' : isChecked ? 'Selected' : 'Select'}
+                              {chat.isMonitored
+                                ? isChecked ? 'Unmonitor?' : 'Monitored'
+                                : isChecked ? 'Selected' : 'Select'}
                             </span>
                           </div>
                         </div>
@@ -528,9 +614,8 @@ const ScrapedChats = ({ setToast }) => {
           </div>
         </section>
 
-        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${
-          showMobileMessages ? 'flex' : 'hidden xl:flex'
-        }`}>
+        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${showMobileMessages ? 'flex' : 'hidden xl:flex'
+          }`}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <button
@@ -549,7 +634,7 @@ const ScrapedChats = ({ setToast }) => {
                   {selectedChat ? selectedChat.name : 'Messages'}
                 </h2>
                 <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate mt-0.5">
-                  {selectedChat?.jid || API_ENDPOINTS.scrapedChatMessages}
+                  {selectedChat ? selectedChat.jid : 'Select a chat to view conversation'}
                 </p>
               </div>
             </div>
@@ -594,11 +679,10 @@ const ScrapedChats = ({ setToast }) => {
               <div className="space-y-3">
                 {messages.map(message => (
                   <div key={message.id} className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[86%] rounded-2xl border p-3 shadow-sm ${
-                      message.fromMe
+                    <div className={`max-w-[86%] rounded-2xl border p-3 shadow-sm ${message.fromMe
                         ? 'bg-emerald-600 border-emerald-600 text-white'
                         : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
-                    }`}>
+                      }`}>
                       <div className="flex items-center justify-between gap-4 mb-1.5">
                         <p className={`text-[10px] font-bold truncate ${message.fromMe ? 'text-emerald-50' : 'text-slate-500 dark:text-slate-400'}`}>
                           {message.fromMe ? 'You' : message.senderName}

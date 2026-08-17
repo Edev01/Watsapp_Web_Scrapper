@@ -102,6 +102,8 @@ const QRConnect = () => {
 
       // Listen for 'new_qr' event from backend
       socket.on('new_qr', (data) => {
+        console.log("new_qr_data", data);
+        
         const rawData = Array.isArray(data) ? data[0] : data
         const qrCode = typeof rawData === 'string'
           ? rawData
@@ -120,10 +122,15 @@ const QRConnect = () => {
           setErrorMsg('')
           isInitialFetch.current = false
         }
+        
       })
+
+    
 
       // Listen for 'qr_disappeared' event from backend
       socket.on('qr_disappeared', () => {
+        console.log("qr_disappeared");
+        
         setQrData(null)
         setStatus(STATUS.CONNECTED)
       })
