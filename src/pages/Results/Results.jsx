@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import PropertyFilters, { DEFAULT_FILTERS } from '../../components/PropertyFilters/PropertyFilters'
 import { CardSkeleton } from '../../components/Skeleton/Skeleton'
 import { mlSearchApi } from '../../api'
@@ -148,7 +149,7 @@ const PropertyCard = ({ p, onSelect }) => (
             e.stopPropagation()
             onSelect(p)
           }}
-          className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 inline-flex items-center gap-1"
+          className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 inline-flex items-center gap-1 cursor-pointer"
         >
           View Details →
         </button>
@@ -268,7 +269,7 @@ const PropertyTable = ({ properties, onSelect }) => (
   </div>
 )
 
-// 🪟 Side Drawer / Slide-Over Component for Full Property Data
+// 🪟 Ultra-Smooth Framer-Motion Animated Side Drawer
 const PropertyDrawer = ({ property, onClose }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -278,190 +279,207 @@ const PropertyDrawer = ({ property, onClose }) => {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  if (!property) return null
-
-  const cleanPhone = property.phone ? property.phone.replace(/[^0-9]/g, '') : ''
+  const cleanPhone = property?.phone ? property.phone.replace(/[^0-9]/g, '') : ''
   const waPhone = cleanPhone.startsWith('0') ? '92' + cleanPhone.slice(1) : cleanPhone
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-      />
+    <AnimatePresence>
+      {property && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Smooth Fade Backdrop */}
+          <motion.div
+            key="drawer-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            onClick={onClose}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+          />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-lg md:max-w-xl bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-700 flex flex-col transform transition-transform duration-300 ease-in-out">
-          
-          {/* Drawer Header */}
-          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 bg-slate-50/70 dark:bg-slate-800/60">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${property.purpose === 'Buy' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'}`}>
-                  For {property.purpose}
-                </span>
-                <SentimentBadge sentiment={property.sentiment} />
-                {property.category && (
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300">
-                    {property.category}
-                  </span>
-                )}
-              </div>
-              <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 leading-snug">
-                {property.title}
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                📍 {property.location}{property.city ? `, ${property.city}` : ''}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0"
-              aria-label="Close drawer"
+          {/* Smooth Slide-over Panel */}
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+            <motion.div
+              key="drawer-panel"
+              initial={{ x: '100%', opacity: 0.7 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0.7 }}
+              transition={{
+                type: 'spring',
+                damping: 28,
+                stiffness: 260,
+                mass: 0.85,
+              }}
+              className="w-screen max-w-lg md:max-w-xl bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-700 flex flex-col relative z-10"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Drawer Body (Scrollable) */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
-            
-            {/* Price Highlight Banner */}
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-4 text-white shadow-md">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-100">Demand / Price</p>
-              <p className="text-2xl font-black mt-0.5">
-                {formatPrice(property.price, property.purpose, property.priceFormatted)}
-              </p>
-            </div>
-
-            {/* Quick Specs Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
-                <p className="text-[10px] font-bold uppercase text-slate-400">Type</p>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.type || 'N/A'}</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
-                <p className="text-[10px] font-bold uppercase text-slate-400">Size</p>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">
-                  {property.area > 0 ? `${property.area} ${property.areaUnit}` : 'N/A'}
-                </p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
-                <p className="text-[10px] font-bold uppercase text-slate-400">Sub-Type</p>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.subType || 'Standard'}</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
-                <p className="text-[10px] font-bold uppercase text-slate-400">City</p>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.city || 'N/A'}</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700 col-span-2">
-                <p className="text-[10px] font-bold uppercase text-slate-400">Location Details</p>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">{property.location || 'N/A'}</p>
-              </div>
-            </div>
-
-            {/* AI Summary Section */}
-            {property.summary && (
-              <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-sm">🤖</span>
-                  <p className="text-xs font-black text-blue-700 dark:text-blue-300 uppercase tracking-wide">
-                    AI Parsed Summary
+              {/* Drawer Header */}
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 bg-slate-50/70 dark:bg-slate-800/60">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${property.purpose === 'Buy' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'}`}>
+                      For {property.purpose}
+                    </span>
+                    <SentimentBadge sentiment={property.sentiment} />
+                    {property.category && (
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300">
+                        {property.category}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 leading-snug">
+                    {property.title}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    📍 {property.location}{property.city ? `, ${property.city}` : ''}
                   </p>
                 </div>
-                <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed font-medium">
-                  {property.summary}
-                </p>
-                {property.intent && (
-                  <div className="mt-2.5 pt-2.5 border-t border-blue-200/60 dark:border-blue-900/60 flex items-center gap-1.5 text-[11px] text-blue-700 dark:text-blue-300">
-                    <span className="font-bold">Detected Intent:</span>
-                    <span>{property.intent}</span>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                  aria-label="Close drawer"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Drawer Body (Scrollable) */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                {/* Price Highlight Banner */}
+                <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-4 text-white shadow-md">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-100">Demand / Price</p>
+                  <p className="text-2xl font-black mt-0.5">
+                    {formatPrice(property.price, property.purpose, property.priceFormatted)}
+                  </p>
+                </div>
+
+                {/* Quick Specs Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Type</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.type || 'N/A'}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Size</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                      {property.area > 0 ? `${property.area} ${property.areaUnit}` : 'N/A'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Sub-Type</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.subType || 'Standard'}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">City</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.city || 'N/A'}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700 col-span-2">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Location Details</p>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">{property.location || 'N/A'}</p>
+                  </div>
+                </div>
+
+                {/* AI Summary Section */}
+                {property.summary && (
+                  <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-sm">🤖</span>
+                      <p className="text-xs font-black text-blue-700 dark:text-blue-300 uppercase tracking-wide">
+                        AI Parsed Summary
+                      </p>
+                    </div>
+                    <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed font-medium">
+                      {property.summary}
+                    </p>
+                    {property.intent && (
+                      <div className="mt-2.5 pt-2.5 border-t border-blue-200/60 dark:border-blue-900/60 flex items-center gap-1.5 text-[11px] text-blue-700 dark:text-blue-300">
+                        <span className="font-bold">Detected Intent:</span>
+                        <span>{property.intent}</span>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Original Scraped WhatsApp Message */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300">
-                  💬 Original WhatsApp Message
-                </p>
-                <span className="text-[10px] text-slate-400">Raw text</span>
-              </div>
-              <div className="p-4 bg-slate-100 dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap select-text max-h-72 overflow-y-auto">
-                {property.description || 'No raw message available'}
-              </div>
-            </div>
+                {/* Original Scraped WhatsApp Message */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                      💬 Original WhatsApp Message
+                    </p>
+                    <span className="text-[10px] text-slate-400">Raw text</span>
+                  </div>
+                  <div className="p-4 bg-slate-100 dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap select-text max-h-72 overflow-y-auto">
+                    {property.description || 'No raw message available'}
+                  </div>
+                </div>
 
-            {/* Contact & Meta Info */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-3">
-              <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300">
-                📞 Contact & Source Info
-              </p>
-              
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-medium">Phone Number:</span>
-                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                  {property.phone || 'Not available'}
-                </span>
+                {/* Contact & Meta Info */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-3">
+                  <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                    📞 Contact & Source Info
+                  </p>
+                  
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400 font-medium">Phone Number:</span>
+                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                      {property.phone || 'Not available'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400 font-medium">Scraped At:</span>
+                    <span className="text-slate-700 dark:text-slate-300 font-medium">
+                      {formatDate(property.scrapedAt)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400 font-medium">Message ID:</span>
+                    <span className="text-slate-700 dark:text-slate-300 font-mono">
+                      #{property.id}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-medium">Scraped At:</span>
-                <span className="text-slate-700 dark:text-slate-300 font-medium">
-                  {formatDate(property.scrapedAt)}
-                </span>
-              </div>
+              {/* Drawer Footer with Actions */}
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 flex items-center gap-2.5">
+                {waPhone ? (
+                  <a
+                    href={`https://wa.me/${waPhone}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-colors"
+                  >
+                    <span>💬 WhatsApp</span>
+                  </a>
+                ) : null}
 
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-medium">Message ID:</span>
-                <span className="text-slate-700 dark:text-slate-300 font-mono">
-                  #{property.id}
-                </span>
+                {property.phone ? (
+                  <a
+                    href={`tel:${property.phone}`}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white font-bold text-xs shadow-sm transition-colors"
+                  >
+                    <span>📞 Call</span>
+                  </a>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
               </div>
-            </div>
+            </motion.div>
           </div>
-
-          {/* Drawer Footer with Actions */}
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 flex items-center gap-2.5">
-            {waPhone ? (
-              <a
-                href={`https://wa.me/${waPhone}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-colors"
-              >
-                <span>💬 WhatsApp</span>
-              </a>
-            ) : null}
-
-            {property.phone ? (
-              <a
-                href={`tel:${property.phone}`}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white font-bold text-xs shadow-sm transition-colors"
-              >
-                <span>📞 Call</span>
-              </a>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors"
-            >
-              Close
-            </button>
-          </div>
-
         </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   )
 }
 
@@ -730,7 +748,7 @@ const Results = () => {
         )}
       </div>
 
-      {/* Side Drawer for Property Details */}
+      {/* Ultra-Smooth Animated Side Drawer for Property Details */}
       <PropertyDrawer
         property={selectedProperty}
         onClose={() => setSelectedProperty(null)}
