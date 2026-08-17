@@ -180,24 +180,25 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
 
       {/* Row 2: Price Scroller (Full Width) */}
       {(() => {
-        const maxLimit = 50000000
+        const maxLimit = 500000000
         const currentVal = !filters.priceMax ? maxLimit : Number(filters.priceMax)
         const pct = Math.min(100, Math.max(0, (currentVal / maxLimit) * 100))
 
         const presets = [
           { label: 'Any Price', value: '' },
-          { label: '< 50 Lac', value: 5000000 },
           { label: '< 1 Cr', value: 10000000 },
-          { label: '< 2.5 Cr', value: 25000000 },
           { label: '< 5 Cr', value: 50000000 },
+          { label: '< 10 Cr', value: 100000000 },
+          { label: '< 25 Cr', value: 250000000 },
+          { label: '< 50 Cr', value: 500000000 },
         ]
 
         return (
           <div className="w-full bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 shadow-xs space-y-3 transition-colors">
-            <div className="flex justify-between items-center">
+             <div className="flex justify-between items-center">
               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Price Range (PKR)</span>
               <span className="inline-flex items-center px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 font-extrabold text-xs shadow-xs">
-                {currentVal >= maxLimit ? 'PKR 0 — Any Price (5 Cr+)' : `PKR 0 — ${formatPriceRangeLabel(currentVal)}`}
+                {currentVal >= maxLimit ? 'PKR 0 — Any Price (50 Cr+)' : `PKR 0 — ${formatPriceRangeLabel(currentVal)}`}
               </span>
             </div>
 
@@ -216,7 +217,7 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
                 type="range"
                 min="0"
                 max={maxLimit}
-                step="500000"
+                step="1000000"
                 value={currentVal}
                 onChange={e => {
                   const val = Number(e.target.value) >= maxLimit ? '' : e.target.value

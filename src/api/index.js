@@ -97,7 +97,7 @@ export const mlSearchApi = {
     if (filters.sortBy) payload.sortBy = filters.sortBy
     if (filters.query) payload.query = filters.query
 
-    payload.limit = filters.limit || 100
+    payload.limit = filters.limit || 10000
 
     return fetch(`${ML_BASE_URL}/api/dashboard-search`, {
       method: 'POST',

@@ -75,8 +75,10 @@ const SignIn = ({ setAuthUser, setToast }) => {
           const email = userObj.email || signInData.email;
           const role = userObj.role || (email.toLowerCase().includes('admin') ? 'admin' : 'user');
           const fullName = userObj.fullName || userObj.name || (role === 'admin' ? 'Admin User' : 'Standard User');
+          const id = userObj.id || userObj._id || userObj.userId || '';
 
           const loggedInUser = {
+            id,
             fullName,
             email,
             role,
@@ -93,6 +95,7 @@ const SignIn = ({ setAuthUser, setToast }) => {
           const foundLocal = localUsers.find(u => u.email?.toLowerCase() === signInData.email.toLowerCase() && u.password === signInData.password)
           if (foundLocal) {
             const loggedInUser = {
+              id: foundLocal.id || foundLocal._id || foundLocal.email || 'demo-user-id',
               fullName: foundLocal.fullName,
               email: foundLocal.email,
               role: foundLocal.role || 'user',
@@ -118,6 +121,7 @@ const SignIn = ({ setAuthUser, setToast }) => {
         const foundLocal = localUsers.find(u => u.email?.toLowerCase() === signInData.email.toLowerCase() && u.password === signInData.password)
         if (foundLocal) {
           const loggedInUser = {
+            id: foundLocal.id || foundLocal._id || foundLocal.email || 'demo-user-id',
             fullName: foundLocal.fullName,
             email: foundLocal.email,
             role: foundLocal.role || 'user',
