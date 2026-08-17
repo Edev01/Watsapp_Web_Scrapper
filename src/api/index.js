@@ -89,13 +89,15 @@ export const mlSearchApi = {
     if (filters.propertySubType) payload.propertySubType = filters.propertySubType
     if (filters.priceMin) payload.priceMin = parseFloat(filters.priceMin)
     if (filters.priceMax) payload.priceMax = parseFloat(filters.priceMax)
-    if (filters.areaUnit) payload.areaUnit = filters.areaUnit
-    if (filters.areaMin) payload.areaMin = parseFloat(filters.areaMin)
-    if (filters.areaMax) payload.areaMax = parseFloat(filters.areaMax)
+    if (filters.areaMin || filters.areaMax) {
+      if (filters.areaUnit) payload.areaUnit = filters.areaUnit
+      if (filters.areaMin) payload.areaMin = parseFloat(filters.areaMin)
+      if (filters.areaMax) payload.areaMax = parseFloat(filters.areaMax)
+    }
     if (filters.sortBy) payload.sortBy = filters.sortBy
     if (filters.query) payload.query = filters.query
 
-    payload.limit = filters.limit || 20
+    payload.limit = filters.limit || 50
 
     return fetch(`${ML_BASE_URL}/api/dashboard-search`, {
       method: 'POST',
