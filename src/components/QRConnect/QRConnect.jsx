@@ -94,6 +94,19 @@ const QRConnect = () => {
 
       socket.on('connect', () => {
         setSocketConnected(true)
+        try {
+          const saved = localStorage.getItem('currentUser')
+          if (saved) {
+            const userObj = JSON.parse(saved)
+            const userId = userObj.id || userObj._id || userObj.email || ''
+            if (userId) {
+              console.log("Emitting join_user_room for userId:", userId)
+              socket.emit("join_user_room", { userId })
+            }
+          }
+        } catch (err) {
+          console.error("Error emitting join_user_room on connect:", err)
+        }
       })
 
       socket.on('disconnect', () => {

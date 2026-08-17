@@ -85,8 +85,6 @@ export const mlSearchApi = {
     if (filters.purpose && filters.purpose !== 'All') payload.purpose = filters.purpose
     if (filters.city && filters.city !== 'All Cities') payload.city = filters.city
     if (filters.location) payload.location = filters.location
-    if (filters.propertyType && filters.propertyType !== 'All') payload.propertyType = filters.propertyType
-    if (filters.propertySubType) payload.propertySubType = filters.propertySubType
     if (filters.priceMin) payload.priceMin = parseFloat(filters.priceMin)
     if (filters.priceMax) payload.priceMax = parseFloat(filters.priceMax)
     if (filters.areaMin || filters.areaMax) {
@@ -97,7 +95,7 @@ export const mlSearchApi = {
     if (filters.sortBy) payload.sortBy = filters.sortBy
     if (filters.query) payload.query = filters.query
 
-    payload.limit = filters.limit || 100
+    payload.limit = filters.limit || 10000
 
     return fetch(`${ML_BASE_URL}/api/dashboard-search`, {
       method: 'POST',

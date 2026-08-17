@@ -67,12 +67,19 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
     return localStorage.getItem('user_active_tab') || 'search'
   })
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [filters, setFilters] = useState(() => {
+    const saved = localStorage.getItem('property_search_filters')
+    return saved ? JSON.parse(saved) : DEFAULT_FILTERS
+  })
   const [tabLoading, setTabLoading] = useState(true)
 
   useEffect(() => {
     localStorage.setItem('user_active_tab', activeTab)
   }, [activeTab])
+
+  useEffect(() => {
+    localStorage.setItem('property_search_filters', JSON.stringify(filters))
+  }, [filters])
 
   const handleSearch = (appliedFilters) => {
     navigate('/results', { state: { filters: appliedFilters } })
