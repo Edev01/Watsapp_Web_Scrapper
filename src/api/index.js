@@ -76,7 +76,7 @@ export const propertyApi = {
 };
 
 // ML WhatsApp AI Search Backend
-const ML_BASE_URL = import.meta.env.VITE_ML_API_URL || (import.meta.env.DEV ? '/ml-api' : 'http://13.48.129.228:8000');
+const ML_BASE_URL = import.meta.env.VITE_ML_API_URL || '/ml-api';
 
 export const mlSearchApi = {
   dashboardSearch: (filters = {}) => {
