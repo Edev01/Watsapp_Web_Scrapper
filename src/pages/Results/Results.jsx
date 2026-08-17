@@ -1,10 +1,10 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import PropertyFilters, { DEFAULT_FILTERS } from '../../components/PropertyFilters/PropertyFilters'
 import { CardSkeleton } from '../../components/Skeleton/Skeleton'
 import { mlSearchApi } from '../../api'
 
-// Map ML API response item to normalized property object
+// 🔄 Map ML API response item to normalized property object
 const normalizeMLResult = (item, index) => {
   const purposeMap = { SALE: 'Buy', RENT: 'Rent', BUY: 'Buy' }
   const rawPurpose = (item.purpose || '').toUpperCase()
@@ -29,6 +29,8 @@ const normalizeMLResult = (item, index) => {
     purpose,
     city: item.city || '',
     location: location || 'Unknown',
+    areaName: item.area || '',
+    vicinity: item.vicinity || '',
     currency: 'PKR',
     phone: item.contact_number || '',
     scrapedFrom: 'WhatsApp AI Search',
@@ -50,31 +52,49 @@ const formatPrice = (price, purpose, priceFormatted) => {
   return `PKR ${price.toLocaleString()}`
 }
 
-const formatDate = iso => new Date(iso).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+const formatDate = iso => {
+  if (!iso) return ''
+  try {
+    return new Date(iso).toLocaleDateString('en-PK', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
+}
 
 const SentimentBadge = ({ sentiment }) => {
   if (!sentiment) return null
   const s = sentiment.toUpperCase()
   const styles = {
-    POSITIVE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400',
-    NEUTRAL: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
-    NEGATIVE: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400',
+    POSITIVE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50',
+    NEUTRAL: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600',
+    NEGATIVE: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50',
   }
+  const icons = { POSITIVE: '😊', NEUTRAL: '😐', NEGATIVE: '😟' }
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${styles[s] || styles.NEUTRAL}`}>
-      {s === 'POSITIVE' ? '\u{1F60A}' : s === 'NEGATIVE' ? '\u{1F61F}' : '\u{1F610}'} {s.charAt(0) + s.slice(1).toLowerCase()}
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${styles[s] || styles.NEUTRAL}`}>
+      <span>{icons[s] || '•'}</span>
+      <span>{s.charAt(0) + s.slice(1).toLowerCase()}</span>
     </span>
   )
 }
 
-const PropertyCard = ({ p, viewMode }) => (
-  <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-700 transition-all duration-200 overflow-hidden group ${
-    viewMode === 'list' ? 'flex items-stretch' : 'flex flex-col'
-  }`}>
-    <div className={`${viewMode === 'grid' ? 'h-1.5 w-full' : 'w-1.5 shrink-0'} ${p.purpose === 'Buy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+// 🗂️ Grid Property Card Component
+const PropertyCard = ({ p, onSelect }) => (
+  <div
+    onClick={() => onSelect(p)}
+    className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-lg hover:border-emerald-300 dark:hover:border-emerald-600 transition-all duration-200 overflow-hidden group flex flex-col cursor-pointer"
+  >
+    <div className={`h-1.5 w-full ${p.purpose === 'Buy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
     <div className="p-4 flex flex-col flex-1">
       <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.purpose === 'Buy' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'}`}>For {p.purpose}</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.purpose === 'Buy' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'}`}>
+          For {p.purpose}
+        </span>
         <SentimentBadge sentiment={p.sentiment} />
         {p.category && (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400">
@@ -82,52 +102,383 @@ const PropertyCard = ({ p, viewMode }) => (
           </span>
         )}
       </div>
-      <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug mb-0.5 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">{p.title}</h3>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{'\u{1F4CD}'} {p.location}{p.city ? `, ${p.city}` : ''}</p>
 
-      <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mb-2">{formatPrice(p.price, p.purpose, p.priceFormatted)}</p>
+      <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug mb-0.5 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors line-clamp-1">
+        {p.title}
+      </h3>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 truncate">
+        📍 {p.location}{p.city ? `, ${p.city}` : ''}
+      </p>
 
+      {/* Price */}
+      <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mb-2">
+        {formatPrice(p.price, p.purpose, p.priceFormatted)}
+      </p>
+
+      {/* Tags */}
       <div className="flex flex-wrap gap-1.5 mb-2">
         {p.type && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.type}</span>}
         {p.area > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.area} {p.areaUnit}</span>}
         {p.subType && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.subType}</span>}
       </div>
 
+      {/* AI Summary */}
       {p.summary && (
         <div className="mb-2 px-3 py-2 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40">
-          <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-0.5">{'\u{1F916}'} AI Summary</p>
+          <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-0.5">🤖 AI Summary</p>
           <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed line-clamp-2">{p.summary}</p>
         </div>
       )}
 
+      {/* Description */}
       <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mb-3">{p.description}</p>
 
-      <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-750 mt-auto">
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700 mt-auto text-xs">
         <div>
-          {p.phone && <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{'\u{1F4DE}'} {p.phone}</p>}
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{p.scrapedFrom}</p>
+          {p.phone ? (
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 font-semibold">📞 {p.phone}</p>
+          ) : (
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">No contact</p>
+          )}
         </div>
-        <div className="text-right">
-          <p className="text-[10px] text-slate-400 dark:text-slate-550">{formatDate(p.scrapedAt)}</p>
-          {p.intent && <p className="text-[10px] text-purple-500 dark:text-purple-400 mt-0.5 truncate max-w-[150px]">{'\u{1F3AF}'} {p.intent}</p>}
-        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onSelect(p)
+          }}
+          className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 inline-flex items-center gap-1"
+        >
+          View Details →
+        </button>
       </div>
     </div>
   </div>
 )
 
+// 💀 Table Skeleton Loading Component
+const TableSkeleton = () => (
+  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden animate-pulse">
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-xs">
+        <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700">
+          <tr>
+            <th className="px-5 py-4 w-32"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" /></th>
+            <th className="px-5 py-4"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" /></th>
+            <th className="px-5 py-4"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" /></th>
+            <th className="px-5 py-4 w-44"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" /></th>
+            <th className="px-5 py-4 w-48"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-28" /></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/70">
+          {[...Array(6)].map((_, i) => (
+            <tr key={i}>
+              <td className="px-5 py-4"><div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded-full" /></td>
+              <td className="px-5 py-4 space-y-2">
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-48" />
+                <div className="h-3 bg-slate-100 dark:bg-slate-700/60 rounded w-28" />
+              </td>
+              <td className="px-5 py-4 space-y-1.5">
+                <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-36" />
+                <div className="h-2.5 bg-slate-100 dark:bg-slate-700/60 rounded w-20" />
+              </td>
+              <td className="px-5 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-24" /></td>
+              <td className="px-5 py-4"><div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-28" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+)
+
+// 📊 Table Component for Row View (Status, Property, Location, Price, Contact)
+const PropertyTable = ({ properties, onSelect }) => (
+  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+        <thead className="bg-slate-50 dark:bg-slate-900/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider border-b border-slate-200 dark:border-slate-700">
+          <tr>
+            <th scope="col" className="px-5 py-4 w-32">Status</th>
+            <th scope="col" className="px-5 py-4">Property</th>
+            <th scope="col" className="px-5 py-4">Location</th>
+            <th scope="col" className="px-5 py-4 w-44">Price</th>
+            <th scope="col" className="px-5 py-4 w-48">Contact Number</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/70">
+          {properties.map((p) => (
+            <tr
+              key={p.id}
+              onClick={() => onSelect(p)}
+              className="hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer group"
+            >
+              {/* Rent / Sale */}
+              <td className="px-5 py-4 whitespace-nowrap">
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${p.purpose === 'Buy' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'}`}>
+                  For {p.purpose}
+                </span>
+              </td>
+
+              {/* Property Title & Specs */}
+              <td className="px-5 py-4">
+                <p className="font-bold text-slate-900 dark:text-slate-100 text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                  {p.title}
+                </p>
+                <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                  <span className="font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/60 px-1.5 py-0.5 rounded">{p.type}</span>
+                  {p.area > 0 && <span>• {p.area} {p.areaUnit}</span>}
+                  {p.subType && <span>• {p.subType}</span>}
+                </div>
+              </td>
+
+              {/* Location */}
+              <td className="px-5 py-4">
+                <div className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-medium">
+                  <span className="text-slate-400 shrink-0">📍</span>
+                  <span>{p.location || 'Unknown'}</span>
+                </div>
+                {p.city && <p className="text-[11px] text-slate-400 dark:text-slate-500 ml-4 mt-0.5">{p.city}</p>}
+              </td>
+
+              {/* Price */}
+              <td className="px-5 py-4 whitespace-nowrap">
+                <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-base">
+                  {formatPrice(p.price, p.purpose, p.priceFormatted)}
+                </span>
+              </td>
+
+              {/* Contact */}
+              <td className="px-5 py-4 whitespace-nowrap">
+                {p.phone ? (
+                  <span className="font-mono text-slate-800 dark:text-slate-200 text-xs font-bold bg-slate-100 dark:bg-slate-700/60 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-600 inline-flex items-center gap-1.5">
+                    <span>📞</span>
+                    <span>{p.phone}</span>
+                  </span>
+                ) : (
+                  <span className="text-slate-400 text-xs italic">Not provided</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+)
+
+// 🪟 Side Drawer / Slide-Over Component for Full Property Data
+const PropertyDrawer = ({ property, onClose }) => {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  if (!property) return null
+
+  const cleanPhone = property.phone ? property.phone.replace(/[^0-9]/g, '') : ''
+  const waPhone = cleanPhone.startsWith('0') ? '92' + cleanPhone.slice(1) : cleanPhone
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+      />
+
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+        <div className="w-screen max-w-lg md:max-w-xl bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-700 flex flex-col transform transition-transform duration-300 ease-in-out">
+          
+          {/* Drawer Header */}
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 bg-slate-50/70 dark:bg-slate-800/60">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${property.purpose === 'Buy' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'}`}>
+                  For {property.purpose}
+                </span>
+                <SentimentBadge sentiment={property.sentiment} />
+                {property.category && (
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300">
+                    {property.category}
+                  </span>
+                )}
+              </div>
+              <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 leading-snug">
+                {property.title}
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                📍 {property.location}{property.city ? `, ${property.city}` : ''}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0"
+              aria-label="Close drawer"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Drawer Body (Scrollable) */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            
+            {/* Price Highlight Banner */}
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-4 text-white shadow-md">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-100">Demand / Price</p>
+              <p className="text-2xl font-black mt-0.5">
+                {formatPrice(property.price, property.purpose, property.priceFormatted)}
+              </p>
+            </div>
+
+            {/* Quick Specs Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
+                <p className="text-[10px] font-bold uppercase text-slate-400">Type</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.type || 'N/A'}</p>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
+                <p className="text-[10px] font-bold uppercase text-slate-400">Size</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                  {property.area > 0 ? `${property.area} ${property.areaUnit}` : 'N/A'}
+                </p>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
+                <p className="text-[10px] font-bold uppercase text-slate-400">Sub-Type</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.subType || 'Standard'}</p>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700">
+                <p className="text-[10px] font-bold uppercase text-slate-400">City</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">{property.city || 'N/A'}</p>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700 col-span-2">
+                <p className="text-[10px] font-bold uppercase text-slate-400">Location Details</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">{property.location || 'N/A'}</p>
+              </div>
+            </div>
+
+            {/* AI Summary Section */}
+            {property.summary && (
+              <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-sm">🤖</span>
+                  <p className="text-xs font-black text-blue-700 dark:text-blue-300 uppercase tracking-wide">
+                    AI Parsed Summary
+                  </p>
+                </div>
+                <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed font-medium">
+                  {property.summary}
+                </p>
+                {property.intent && (
+                  <div className="mt-2.5 pt-2.5 border-t border-blue-200/60 dark:border-blue-900/60 flex items-center gap-1.5 text-[11px] text-blue-700 dark:text-blue-300">
+                    <span className="font-bold">Detected Intent:</span>
+                    <span>{property.intent}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Original Scraped WhatsApp Message */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                  💬 Original WhatsApp Message
+                </p>
+                <span className="text-[10px] text-slate-400">Raw text</span>
+              </div>
+              <div className="p-4 bg-slate-100 dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap select-text max-h-72 overflow-y-auto">
+                {property.description || 'No raw message available'}
+              </div>
+            </div>
+
+            {/* Contact & Meta Info */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-3">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                📞 Contact & Source Info
+              </p>
+              
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Phone Number:</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                  {property.phone || 'Not available'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Scraped At:</span>
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  {formatDate(property.scrapedAt)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Message ID:</span>
+                <span className="text-slate-700 dark:text-slate-300 font-mono">
+                  #{property.id}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Drawer Footer with Actions */}
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 flex items-center gap-2.5">
+            {waPhone ? (
+              <a
+                href={`https://wa.me/${waPhone}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-colors"
+              >
+                <span>💬 WhatsApp</span>
+              </a>
+            ) : null}
+
+            {property.phone ? (
+              <a
+                href={`tel:${property.phone}`}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white font-bold text-xs shadow-sm transition-colors"
+              >
+                <span>📞 Call</span>
+              </a>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors"
+            >
+              Close
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// 🏠 Main Results Page
 const Results = () => {
   const location = useLocation()
   const navigate = useNavigate()
 
   const initialFilters = location.state?.filters || DEFAULT_FILTERS
 
-  const [filters, setFilters] = useState(initialFilters)
   const [committed, setCommitted] = useState(initialFilters)
-  const [viewMode, setViewMode] = useState('grid')
+  const [viewMode, setViewMode] = useState('list') // Default to 'list' (Table View)
   const [loading, setLoading] = useState(true)
   const [results, setResults] = useState([])
   const [error, setError] = useState('')
+  const [searchTerm, setSearchTerm] = useState('') // Live search query state
+  const [selectedProperty, setSelectedProperty] = useState(null) // Drawer state
 
   useEffect(() => {
     setLoading(true)
@@ -152,17 +503,36 @@ const Results = () => {
       })
   }, [committed])
 
-  const handleSearch = (newFilters) => {
-    setCommitted(newFilters)
-  }
+  // 🔍 Real-time Live Filter on Results
+  const filteredResults = useMemo(() => {
+    if (!searchTerm.trim()) return results
+    const q = searchTerm.trim().toLowerCase()
+    return results.filter(p => {
+      return (
+        (p.title && p.title.toLowerCase().includes(q)) ||
+        (p.location && p.location.toLowerCase().includes(q)) ||
+        (p.city && p.city.toLowerCase().includes(q)) ||
+        (p.type && p.type.toLowerCase().includes(q)) ||
+        (p.subType && p.subType.toLowerCase().includes(q)) ||
+        (p.phone && p.phone.toLowerCase().includes(q)) ||
+        (p.summary && p.summary.toLowerCase().includes(q)) ||
+        (p.intent && p.intent.toLowerCase().includes(q)) ||
+        (p.category && p.category.toLowerCase().includes(q)) ||
+        (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.priceFormatted && p.priceFormatted.toLowerCase().includes(q))
+      )
+    })
+  }, [results, searchTerm])
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 transition-colors pb-12">
+      {/* Top Header */}
       <header className="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
             className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-750 cursor-pointer transition-colors shrink-0"
+            aria-label="Back"
           >
             <svg className="w-5 h-5 text-slate-600 dark:text-slate-350" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -179,16 +549,17 @@ const Results = () => {
           <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
           <h1 className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">
             AI Search Results
-            {committed.city !== 'All Cities' && ` > ${committed.city}`}
-            {committed.location && ` > ${committed.location}`}
+            {committed.city !== 'All Cities' && ` › ${committed.city}`}
+            {committed.location && ` › ${committed.location}`}
           </h1>
           <span className="ml-auto text-[10px] font-bold px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 rounded-lg border border-blue-100 dark:border-blue-900/50 shrink-0">
-            {'\u{1F916}'} AI Powered
+            🤖 AI Powered
           </span>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Active Filters Summary Bar */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 shadow-sm mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-colors">
           <div className="flex-1">
             <p className="text-[11px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wide mb-1">Active Search Filters</p>
@@ -197,26 +568,26 @@ const Results = () => {
                 For {committed.purpose}
               </span>
               <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-600">
-                {committed.city}
+                📍 {committed.city}
               </span>
               {committed.location && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                  "{committed.location}"
+                  📍 "${committed.location}"
                 </span>
               )}
               {committed.propertyType !== 'All' && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 rounded-lg border border-purple-100 dark:border-purple-900/50">
-                  {committed.propertyType} {committed.propertySubType ? `(${committed.propertySubType})` : ''}
+                  🏠 {committed.propertyType} {committed.propertySubType ? `(${committed.propertySubType})` : ''}
                 </span>
               )}
               {(committed.priceMin || committed.priceMax) && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 rounded-lg border border-amber-100 dark:border-amber-900/50">
-                  {committed.priceMin || '0'} to {committed.priceMax || 'Max'}
+                  💰 {committed.priceMin || '0'} to {committed.priceMax || 'Max'}
                 </span>
               )}
               {(committed.areaMin || committed.areaMax) && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 rounded-lg border border-cyan-100 dark:border-cyan-900/50">
-                  {committed.areaMin || '0'} - {committed.areaMax || 'Max'} {committed.areaUnit}
+                  📐 {committed.areaMin || '0'} - {committed.areaMax || 'Max'} {committed.areaUnit}
                 </span>
               )}
             </div>
@@ -233,6 +604,7 @@ const Results = () => {
           </button>
         </div>
 
+        {/* Error Banner */}
         {error && (
           <div className="mb-4 rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 p-4 text-sm text-rose-700 dark:text-rose-300 flex items-center gap-3">
             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -242,48 +614,127 @@ const Results = () => {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-slate-600 dark:text-slate-350">
-            Showing <span className="font-bold text-slate-900 dark:text-slate-100">{results.length}</span> properties
-            {committed.city !== 'All Cities' && <span className="text-slate-500 dark:text-slate-400"> in {committed.city}</span>}
-            {committed.location && <span className="text-slate-500 dark:text-slate-400"> near "{committed.location}"</span>}
-          </p>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg border cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-450 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500'}`}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+        {/* Results Controls Bar with Live Search & View Toggle */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          
+          {/* 🔍 Interactive Live Search Input Bar */}
+          <div className="flex items-center gap-3 flex-1">
+            <div className="relative w-full sm:max-w-md">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Live search by location, property, phone, price..."
+                className="w-full pl-10 pr-9 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-colors shadow-sm"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  aria-label="Clear search"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap hidden md:inline">
+              {filteredResults.length} {filteredResults.length === 1 ? 'property' : 'properties'}
+              {searchTerm && ` (filtered from ${results.length})`}
+            </span>
+          </div>
+
+          {/* View Mode Toggle: Table (Default) vs Grid */}
+          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 self-end sm:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+              aria-label="Table View"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18M3 6h18M3 18h18" />
+              </svg>
+              <span>Table</span>
             </button>
-            <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg border cursor-pointer transition-all ${viewMode === 'list' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-450 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500'}`}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'grid'
+                  ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+              aria-label="Grid View"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+              <span>Grid</span>
             </button>
           </div>
         </div>
 
+        {/* Results View: Skeleton / Empty / Table / Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <CardSkeleton key={i} />
-            ))}
-          </div>
-        ) : results.length === 0 ? (
-          <div className="text-center py-20 transition-colors">
+          viewMode === 'list' ? (
+            <TableSkeleton />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <CardSkeleton key={i} />
+              ))}
+            </div>
+          )
+        ) : filteredResults.length === 0 ? (
+          <div className="text-center py-20 transition-colors bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8">
             <svg className="w-14 h-14 mx-auto text-slate-300 dark:text-slate-650 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <p className="font-bold text-slate-600 dark:text-slate-350 text-base">No properties found</p>
-            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Try adjusting your filters and search again</p>
+            <p className="font-bold text-slate-700 dark:text-slate-300 text-base">
+              {searchTerm ? 'No matching properties found' : 'No properties found'}
+            </p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+              {searchTerm ? 'Try clearing your live search or searching another keyword' : 'Try adjusting your filters and search again'}
+            </p>
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="mt-4 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer"
+              >
+                Clear Search
+              </button>
+            )}
           </div>
+        ) : viewMode === 'list' ? (
+          <PropertyTable properties={filteredResults} onSelect={setSelectedProperty} />
         ) : (
-          <div className={
-            viewMode === 'grid'
-              ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4'
-              : 'flex flex-col gap-3'
-          }>
-            {results.map(p => (
-              <PropertyCard key={p.id} p={p} viewMode={viewMode} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredResults.map((p) => (
+              <PropertyCard key={p.id} p={p} onSelect={setSelectedProperty} />
             ))}
           </div>
         )}
       </div>
+
+      {/* Side Drawer for Property Details */}
+      <PropertyDrawer
+        property={selectedProperty}
+        onClose={() => setSelectedProperty(null)}
+      />
     </div>
   )
 }
