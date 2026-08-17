@@ -2,43 +2,48 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import PropertyFilters, { DEFAULT_FILTERS } from '../../components/PropertyFilters/PropertyFilters'
 import { CardSkeleton } from '../../components/Skeleton/Skeleton'
-import { propertyApi } from '../../api'
+import { mlSearchApi } from '../../api'
 
-// ── All mock data ─────────────────────────────────────────────────────────────
-const ALL_LISTINGS = [
-  { id: 1, title: '5 Marla House — Double Storey', price: 8500000, area: 5, areaUnit: 'Marla', type: 'House', subType: 'Double Storey', purpose: 'Buy', bedrooms: 3, bathrooms: 2, city: 'Karachi', location: 'Scheme 33, Sector 7', verified: true, featured: false, possession: 'Ready', furnished: 'Unfurnished', currency: 'PKR', phone: '0300-1234567', scrapedFrom: 'Real Estate Karachi', scrapedAt: '2026-07-18T14:30:00Z', description: 'Brand new 5 marla house in Scheme 33. Owner built. Ground + 2 floors. Near main road.' },
-  { id: 2, title: '10 Marla Residential Plot', price: 12000000, area: 10, areaUnit: 'Marla', type: 'Plot', subType: 'Residential Plot', purpose: 'Buy', bedrooms: 0, bathrooms: 0, city: 'Karachi', location: 'Scheme 33, Sector 15A', verified: true, featured: true, possession: 'Ready', furnished: 'All', currency: 'PKR', phone: '0312-9876543', scrapedFrom: 'Karachi Property Dealers', scrapedAt: '2026-07-18T13:00:00Z', description: 'Corner plot 10 marla. All utilities available. Urgent sale.' },
-  { id: 3, title: '3 Marla House — Single Storey', price: 5500000, area: 3, areaUnit: 'Marla', type: 'House', subType: 'Single Storey', purpose: 'Buy', bedrooms: 2, bathrooms: 1, city: 'Karachi', location: 'Scheme 33, Sector 9', verified: false, featured: false, possession: 'Ready', furnished: 'Unfurnished', currency: 'PKR', phone: '0321-5555555', scrapedFrom: 'Real Estate Karachi', scrapedAt: '2026-07-18T11:45:00Z', description: 'Small family house in sector 9. Good condition. Near market.' },
-  { id: 4, title: '1 Kanal Farm House', price: 45000000, area: 1, areaUnit: 'Kanal', type: 'House', subType: 'Farm House', purpose: 'Buy', bedrooms: 6, bathrooms: 4, city: 'Karachi', location: 'Gadap Town', verified: true, featured: true, possession: 'Ready', furnished: 'Furnished', currency: 'PKR', phone: '0333-1111111', scrapedFrom: 'Luxury Properties PK', scrapedAt: '2026-07-18T10:20:00Z', description: 'Luxury farmhouse 1 kanal. Swimming pool, lush garden, boundary wall.' },
-  { id: 5, title: '3 Bed Flat — 2nd Floor', price: 35000, area: 1400, areaUnit: 'Sq. Ft.', type: 'Flat', subType: '3 Bed', purpose: 'Rent', bedrooms: 3, bathrooms: 2, city: 'Karachi', location: 'Gulshan-e-Iqbal, Block 13D', verified: true, featured: false, possession: 'Ready', furnished: 'Semi-Furnished', currency: 'PKR', phone: '0345-9999999', scrapedFrom: 'Karachi Rentals Group', scrapedAt: '2026-07-18T09:00:00Z', description: '3 bed flat 2nd floor. CCTV, generator backup, secure building.' },
-  { id: 6, title: '5 Marla House — Triple Storey', price: 9200000, area: 5, areaUnit: 'Marla', type: 'House', subType: 'Triple Storey', purpose: 'Buy', bedrooms: 4, bathrooms: 3, city: 'Lahore', location: 'DHA Phase 5', verified: true, featured: true, possession: 'Ready', furnished: 'Furnished', currency: 'PKR', phone: '0300-7777777', scrapedFrom: 'DHA Lahore Properties', scrapedAt: '2026-07-18T08:15:00Z', description: 'Triple storey 5 marla DHA. Tiles flooring, marble kitchen. Prime location.' },
-  { id: 7, title: 'Studio Apartment', price: 18000, area: 450, areaUnit: 'Sq. Ft.', type: 'Flat', subType: 'Studio', purpose: 'Rent', bedrooms: 1, bathrooms: 1, city: 'Islamabad', location: 'F-11 Markaz', verified: false, featured: false, possession: 'Ready', furnished: 'Furnished', currency: 'PKR', phone: '0311-2222222', scrapedFrom: 'Islamabad Rentals', scrapedAt: '2026-07-17T16:00:00Z', description: 'Fully furnished studio near F-11 markaz. Bills included.' },
-  { id: 8, title: 'Commercial Plot — Main Road', price: 25000000, area: 500, areaUnit: 'Sq. Yd.', type: 'Plot', subType: 'Commercial Plot', purpose: 'Buy', bedrooms: 0, bathrooms: 0, city: 'Karachi', location: 'Tariq Road', verified: true, featured: true, possession: 'Ready', furnished: 'All', currency: 'PKR', phone: '0333-8888888', scrapedFrom: 'Commercial Properties KHI', scrapedAt: '2026-07-17T12:00:00Z', description: 'Prime commercial plot on Tariq Road. Heavy footfall. Ideal for retail.' },
-  { id: 9, title: '2 Marla Shop', price: 15000, area: 2, areaUnit: 'Marla', type: 'Commercial', subType: 'Shop', purpose: 'Rent', bedrooms: 0, bathrooms: 1, city: 'Lahore', location: 'Gulberg III', verified: true, featured: false, possession: 'Ready', furnished: 'Unfurnished', currency: 'PKR', phone: '0321-4444444', scrapedFrom: 'Lahore Commercial', scrapedAt: '2026-07-17T10:00:00Z', description: 'Ground floor shop in busy market. High visibility. Immediate possession.' },
-  { id: 10, title: '8 Marla House — DHA', price: 22000000, area: 8, areaUnit: 'Marla', type: 'House', subType: 'Double Storey', purpose: 'Buy', bedrooms: 4, bathrooms: 4, city: 'Lahore', location: 'DHA Phase 6', verified: true, featured: true, possession: 'Ready', furnished: 'Semi-Furnished', currency: 'PKR', phone: '0300-6666666', scrapedFrom: 'DHA Lahore Properties', scrapedAt: '2026-07-16T14:00:00Z', description: '8 marla luxury house DHA Phase 6. Fully tiled. Separate servant quarter.' },
-]
+// Map ML API response item to normalized property object
+const normalizeMLResult = (item, index) => {
+  const purposeMap = { SALE: 'Buy', RENT: 'Rent', BUY: 'Buy' }
+  const rawPurpose = (item.purpose || '').toUpperCase()
+  const purpose = purposeMap[rawPurpose] || item.purpose || 'Buy'
 
-const applyFilters = (listings, f) =>
-  listings.filter(p => {
-    if (f.purpose && f.purpose !== 'All' && p.purpose !== f.purpose) return false
-    if (f.city && f.city !== 'All Cities' && p.city !== f.city) return false
-    if (f.location && !p.location.toLowerCase().includes(f.location.toLowerCase())) return false
-    if (f.propertyType && f.propertyType !== 'All' && p.type !== f.propertyType) return false
-    if (f.propertySubType && p.subType !== f.propertySubType) return false
-    if (f.priceMin && p.price < parseFloat(f.priceMin)) return false
-    if (f.priceMax && p.price > parseFloat(f.priceMax)) return false
-    if (f.areaMin && p.areaUnit === f.areaUnit && p.area < parseFloat(f.areaMin)) return false
-    if (f.areaMax && p.areaUnit === f.areaUnit && p.area > parseFloat(f.areaMax)) return false
-    return true
-  }).sort((a, b) => {
-    if (f.sortBy === 'Price: Low → High') return a.price - b.price
-    if (f.sortBy === 'Price: High → Low') return b.price - a.price
-    if (f.sortBy === 'Area: Small → Large') return a.area - b.area
-    if (f.sortBy === 'Area: Large → Small') return a.area - b.area
-    return new Date(b.scrapedAt) - new Date(a.scrapedAt)
-  })
+  const propertyType = (item.property_type || '')
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
 
-const formatPrice = (price, purpose) => {
+  const location = [item.area, item.vicinity].filter(Boolean).join(', ')
+
+  return {
+    id: item.message_id || index,
+    title: `${item.size || ''} ${item.property_sub_type || propertyType}`.trim() || 'Property Listing',
+    price: item.price_value || 0,
+    priceFormatted: item.price || '',
+    area: item.size_value || 0,
+    areaUnit: item.size_unit || 'Marla',
+    type: propertyType || 'House',
+    subType: item.property_sub_type || '',
+    purpose,
+    city: item.city || '',
+    location: location || 'Unknown',
+    currency: 'PKR',
+    phone: item.contact_number || '',
+    scrapedFrom: 'WhatsApp AI Search',
+    scrapedAt: item.created_at || new Date().toISOString(),
+    description: item.raw_message || '',
+    summary: item.summary || '',
+    sentiment: item.sentiment || '',
+    intent: item.intent || '',
+    category: item.category || '',
+    similarityScore: item.similarity_score,
+  }
+}
+
+const formatPrice = (price, purpose, priceFormatted) => {
+  if (priceFormatted) return priceFormatted
   if (purpose === 'Rent') return `PKR ${price.toLocaleString()}/mo`
   if (price >= 10000000) return `PKR ${(price / 10000000).toFixed(2).replace(/\.?0+$/, '')} Cr`
   if (price >= 100000) return `PKR ${(price / 100000).toFixed(0)} Lac`
@@ -46,6 +51,21 @@ const formatPrice = (price, purpose) => {
 }
 
 const formatDate = iso => new Date(iso).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+const SentimentBadge = ({ sentiment }) => {
+  if (!sentiment) return null
+  const s = sentiment.toUpperCase()
+  const styles = {
+    POSITIVE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400',
+    NEUTRAL: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
+    NEGATIVE: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400',
+  }
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${styles[s] || styles.NEUTRAL}`}>
+      {s === 'POSITIVE' ? '\u{1F60A}' : s === 'NEGATIVE' ? '\u{1F61F}' : '\u{1F610}'} {s.charAt(0) + s.slice(1).toLowerCase()}
+    </span>
+  )
+}
 
 const PropertyCard = ({ p, viewMode }) => (
   <div className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-700 transition-all duration-200 overflow-hidden group ${
@@ -55,70 +75,82 @@ const PropertyCard = ({ p, viewMode }) => (
     <div className="p-4 flex flex-col flex-1">
       <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.purpose === 'Buy' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'}`}>For {p.purpose}</span>
-        {p.verified && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400">✓ Verified</span>}
-        {p.featured && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400">⭐ Featured</span>}
+        <SentimentBadge sentiment={p.sentiment} />
+        {p.category && (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400">
+            {p.category}
+          </span>
+        )}
       </div>
       <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug mb-0.5 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">{p.title}</h3>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">📍 {p.location}, {p.city}</p>
-      <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mb-2">{formatPrice(p.price, p.purpose)}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{'\u{1F4CD}'} {p.location}{p.city ? `, ${p.city}` : ''}</p>
+
+      <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mb-2">{formatPrice(p.price, p.purpose, p.priceFormatted)}</p>
+
       <div className="flex flex-wrap gap-1.5 mb-2">
-        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.type}</span>
-        <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.area} {p.areaUnit}</span>
-        {p.bedrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">🛏 {p.bedrooms}</span>}
-        {p.bathrooms > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">🚿 {p.bathrooms}</span>}
-        {p.furnished !== 'All' && p.furnished !== 'Unfurnished' && <span className="text-[10px] font-semibold px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 dark:text-indigo-400 rounded-md">{p.furnished}</span>}
+        {p.type && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.type}</span>}
+        {p.area > 0 && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.area} {p.areaUnit}</span>}
+        {p.subType && <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md">{p.subType}</span>}
       </div>
+
+      {p.summary && (
+        <div className="mb-2 px-3 py-2 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40">
+          <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-0.5">{'\u{1F916}'} AI Summary</p>
+          <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed line-clamp-2">{p.summary}</p>
+        </div>
+      )}
+
       <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mb-3">{p.description}</p>
+
       <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-750 mt-auto">
         <div>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">📱 {p.phone}</p>
+          {p.phone && <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{'\u{1F4DE}'} {p.phone}</p>}
           <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{p.scrapedFrom}</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] text-slate-400 dark:text-slate-550">{formatDate(p.scrapedAt)}</p>
-          <button className="mt-1 text-[10px] font-bold text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 cursor-pointer">♡ Save</button>
+          {p.intent && <p className="text-[10px] text-purple-500 dark:text-purple-400 mt-0.5 truncate max-w-[150px]">{'\u{1F3AF}'} {p.intent}</p>}
         </div>
       </div>
     </div>
   </div>
 )
 
-// ── Results Page ──────────────────────────────────────────────────────────────
 const Results = () => {
   const location = useLocation()
   const navigate = useNavigate()
 
-  // Receive filters passed via navigation state
   const initialFilters = location.state?.filters || DEFAULT_FILTERS
 
   const [filters, setFilters] = useState(initialFilters)
-  const [committed, setCommitted] = useState(initialFilters) // filters actually applied to results
+  const [committed, setCommitted] = useState(initialFilters)
   const [viewMode, setViewMode] = useState('grid')
   const [loading, setLoading] = useState(true)
-  const [apiProperties, setApiProperties] = useState([])
+  const [results, setResults] = useState([])
+  const [error, setError] = useState('')
 
   useEffect(() => {
     setLoading(true)
-    console.log('🚀 Sending filter payload to API:', committed)
-    propertyApi.filterProperties(committed)
+    setError('')
+    console.log('Sending filters to ML API:', committed)
+    mlSearchApi.dashboardSearch(committed)
       .then(res => {
-        console.log('📢 API Property Filter Response Received:', res)
-        if (res?.data?.properties && Array.isArray(res.data.properties)) {
-          setApiProperties(res.data.properties)
+        console.log('ML API Response:', res)
+        if (res?.success && Array.isArray(res.results)) {
+          setResults(res.results.map(normalizeMLResult))
         } else {
-          setApiProperties([])
+          setResults([])
         }
       })
       .catch(err => {
-        console.error('❌ API Filter Request Error:', err)
-        setApiProperties([])
+        console.error('ML API Error:', err)
+        setError(err.message || 'Failed to search properties')
+        setResults([])
       })
       .finally(() => {
         setLoading(false)
       })
   }, [committed])
-
-  const results = apiProperties.length > 0 ? apiProperties : applyFilters(ALL_LISTINGS, committed)
 
   const handleSearch = (newFilters) => {
     setCommitted(newFilters)
@@ -126,7 +158,6 @@ const Results = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 transition-colors">
-      {/* Top Bar */}
       <header className="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <button
@@ -147,15 +178,17 @@ const Results = () => {
           </div>
           <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
           <h1 className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">
-            Search Results
-            {committed.city !== 'All Cities' && ` · ${committed.city}`}
-            {committed.location && ` · ${committed.location}`}
+            AI Search Results
+            {committed.city !== 'All Cities' && ` > ${committed.city}`}
+            {committed.location && ` > ${committed.location}`}
           </h1>
+          <span className="ml-auto text-[10px] font-bold px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 rounded-lg border border-blue-100 dark:border-blue-900/50 shrink-0">
+            {'\u{1F916}'} AI Powered
+          </span>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Active Filters Summary Bar */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 shadow-sm mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-colors">
           <div className="flex-1">
             <p className="text-[11px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wide mb-1">Active Search Filters</p>
@@ -164,31 +197,26 @@ const Results = () => {
                 For {committed.purpose}
               </span>
               <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-600">
-                📍 {committed.city}
+                {committed.city}
               </span>
               {committed.location && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                  🔍 "{committed.location}"
+                  "{committed.location}"
                 </span>
               )}
               {committed.propertyType !== 'All' && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 rounded-lg border border-purple-100 dark:border-purple-900/50">
-                  🏠 {committed.propertyType} {committed.propertySubType ? `(${committed.propertySubType})` : ''}
+                  {committed.propertyType} {committed.propertySubType ? `(${committed.propertySubType})` : ''}
                 </span>
               )}
               {(committed.priceMin || committed.priceMax) && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 rounded-lg border border-amber-100 dark:border-amber-900/50">
-                  💰 {committed.priceMin ? `${committed.priceMin} ${committed.currency}` : '0'} to {committed.priceMax ? `${committed.priceMax} ${committed.currency}` : 'Max'}
+                  {committed.priceMin || '0'} to {committed.priceMax || 'Max'}
                 </span>
               )}
-              {committed.bedrooms !== 'Any' && (
-                <span className="text-xs font-bold px-2.5 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 rounded-lg border border-rose-100 dark:border-rose-900/50">
-                  🛏 {committed.bedrooms} Beds
-                </span>
-              )}
-              {committed.verified && (
-                <span className="text-xs font-bold px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 rounded-lg border border-indigo-100 dark:border-indigo-900/50">
-                  ✓ Verified Only
+              {(committed.areaMin || committed.areaMax) && (
+                <span className="text-xs font-bold px-2.5 py-1 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 rounded-lg border border-cyan-100 dark:border-cyan-900/50">
+                  {committed.areaMin || '0'} - {committed.areaMax || 'Max'} {committed.areaUnit}
                 </span>
               )}
             </div>
@@ -205,7 +233,15 @@ const Results = () => {
           </button>
         </div>
 
-        {/* Results Header */}
+        {error && (
+          <div className="mb-4 rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 p-4 text-sm text-rose-700 dark:text-rose-300 flex items-center gap-3">
+            <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            {error}
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-slate-600 dark:text-slate-350">
             Showing <span className="font-bold text-slate-900 dark:text-slate-100">{results.length}</span> properties
@@ -222,7 +258,6 @@ const Results = () => {
           </div>
         </div>
 
-        {/* Results Grid/List / Skeleton Loading */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (

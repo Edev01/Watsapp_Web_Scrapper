@@ -74,3 +74,37 @@ export const propertyApi = {
     body: JSON.stringify({ filters }),
   }),
 };
+
+// ML WhatsApp AI Search Backend
+const ML_BASE_URL = import.meta.env.VITE_ML_API_URL || (import.meta.env.DEV ? '/ml-api' : 'http://13.48.129.228:8000');
+
+export const mlSearchApi = {
+  dashboardSearch: (filters = {}) => {
+    const payload = {}
+
+    if (filters.purpose && filters.purpose !== 'All') payload.purpose = filters.purpose
+    if (filters.city && filters.city !== 'All Cities') payload.city = filters.city
+    if (filters.location) payload.location = filters.location
+    if (filters.propertyType && filters.propertyType !== 'All') payload.propertyType = filters.propertyType
+    if (filters.propertySubType) payload.propertySubType = filters.propertySubType
+    if (filters.priceMin) payload.priceMin = parseFloat(filters.priceMin)
+    if (filters.priceMax) payload.priceMax = parseFloat(filters.priceMax)
+    if (filters.areaUnit) payload.areaUnit = filters.areaUnit
+    if (filters.areaMin) payload.areaMin = parseFloat(filters.areaMin)
+    if (filters.areaMax) payload.areaMax = parseFloat(filters.areaMax)
+    if (filters.sortBy) payload.sortBy = filters.sortBy
+    if (filters.query) payload.query = filters.query
+
+    payload.limit = filters.limit || 20
+
+    return fetch(`${ML_BASE_URL}/api/dashboard-search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(async (res) => {
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.detail || `ML API error: ${res.status}`)
+      return data
+    })
+  },
+};
