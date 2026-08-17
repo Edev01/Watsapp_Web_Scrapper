@@ -557,6 +557,95 @@ const PropertyDrawer = ({ property, onClose }) => {
   )
 }
 
+const CATEGORY_MAP = {
+  'Commercial': [
+    'commercial', 'shop', 'dukan', 'dokan', 'dukaan', 'store', 'showroom', 'retail', 'kiosk',
+    'office', 'dafter', 'daftar', 'desk', 'corporate',
+    'warehouse', 'godown', 'go-down', 'godam', 'ware house', 'storage',
+    'factory', 'karkhana', 'mill', 'plant', 'industrial unit',
+    'building', 'plaza', 'tower', 'complex', 'commercial building', 'commercial plot', 'hall', 'space'
+  ],
+  'House': [
+    'house', 'home', 'makan', 'kothi', 'bangla', 'banglow', 'bungalow', 'bunglow',
+    'villa', 'villas', 'luxury villa', 'duplex', 'farmhouse', 'farm house', 'farm',
+    'single storey', 'single story', 'double storey', 'double story', 'triple storey', 'triple story'
+  ],
+  'Flat': [
+    'flat', 'apartment', 'apartments', 'flats', 'studio', 'penthouse',
+    'portion', 'lower portion', 'upper portion', '1 bed', '2 bed', '3 bed', '4 bed'
+  ],
+  'Plot': [
+    'plot', 'plots', 'file', 'files', 'residential plot', 'commercial plot',
+    'agricultural land', 'industrial land', 'land', 'acre', 'bigha', 'sq yd'
+  ]
+}
+
+const SUB_TYPE_KEYWORD_MAP = {
+  'standard': ['standard', 'general', 'commercial', 'hall', 'space', 'shop', 'office', 'unit'],
+  'shop': ['shop', 'shops', 'dukan', 'dokan', 'dukaan', 'store', 'showroom', 'retail', 'kiosk'],
+  'office': ['office', 'dafter', 'daftar', 'desk', 'corporate'],
+  'warehouse': ['warehouse', 'godown', 'go-down', 'godam', 'ware house', 'storage'],
+  'factory': ['factory', 'karkhana', 'mill', 'plant', 'industrial unit'],
+  'building': ['building', 'plaza', 'tower', 'complex', 'commercial building'],
+  'bungalow': ['bungalow', 'banglow', 'bangla', 'bunglow', 'independent house'],
+  'villa': ['villa', 'villas', 'luxury villa', 'duplex'],
+  'farm house': ['farm house', 'farmhouse', 'farm', 'form house'],
+  'single storey': ['single storey', 'single story', '1 storey', '1 story'],
+  'double storey': ['double storey', 'double story', '2 storey', '2 story', 'g+1'],
+  'triple storey': ['triple storey', 'triple story', '3 storey', '3 story', 'g+2'],
+  'studio': ['studio', 'studio apartment', 'bachelor'],
+  '1 bed': ['1 bed', '1bed', '1-bed', 'one bed', 'single bed'],
+  '2 bed': ['2 bed', '2bed', '2-bed', 'two bed'],
+  '3 bed': ['3 bed', '3bed', '3-bed', 'three bed'],
+  'penthouse': ['penthouse', 'pent house'],
+  'lower portion': ['lower portion', 'lower ground', 'ground portion'],
+  'upper portion': ['upper portion', 'first floor portion', '1st floor portion'],
+  'residential plot': ['residential plot', 'res plot', 'residential'],
+  'commercial plot': ['commercial plot', 'comm plot', 'commercial'],
+  'agricultural land': ['agricultural', 'agri', 'agriculture', 'zari', 'land'],
+  'industrial land': ['industrial plot', 'industrial land', 'factory plot', 'industrial'],
+}
+
+const matchesPropertyType = (property, selectedType) => {
+  if (!selectedType || selectedType === 'All') return true
+  const keywords = CATEGORY_MAP[selectedType]
+  if (!keywords) return true
+
+  const textToSearch = [
+    property.type,
+    property.subType,
+    property.title,
+    property.category,
+    property.summary,
+    property.description,
+  ].filter(Boolean).join(' ').toLowerCase()
+
+  return keywords.some(kw => textToSearch.includes(kw))
+}
+
+const matchesSubType = (property, subType) => {
+  if (!subType || subType === 'Any') return true
+  const target = subType.toLowerCase()
+
+  if (target === 'standard') {
+    if (property.subType && property.subType.toLowerCase().includes('standard')) return true
+    return true
+  }
+
+  const keywords = SUB_TYPE_KEYWORD_MAP[target] || [target]
+
+  const textToSearch = [
+    property.subType,
+    property.type,
+    property.title,
+    property.summary,
+    property.description,
+    property.category,
+  ].filter(Boolean).join(' ').toLowerCase()
+
+  return keywords.some(kw => textToSearch.includes(kw))
+}
+
 // 🏠 Main Results Page
 const Results = () => {
   const location = useLocation()
@@ -604,24 +693,40 @@ const Results = () => {
 
   // 🔍 Real-time Live Filter on Results
   const filteredResults = useMemo(() => {
-    if (!searchTerm.trim()) return results
-    const q = searchTerm.trim().toLowerCase()
-    return results.filter(p => {
-      return (
-        (p.title && p.title.toLowerCase().includes(q)) ||
-        (p.location && p.location.toLowerCase().includes(q)) ||
-        (p.city && p.city.toLowerCase().includes(q)) ||
-        (p.type && p.type.toLowerCase().includes(q)) ||
-        (p.subType && p.subType.toLowerCase().includes(q)) ||
-        (p.phone && p.phone.toLowerCase().includes(q)) ||
-        (p.summary && p.summary.toLowerCase().includes(q)) ||
-        (p.intent && p.intent.toLowerCase().includes(q)) ||
-        (p.category && p.category.toLowerCase().includes(q)) ||
-        (p.description && p.description.toLowerCase().includes(q)) ||
-        (p.priceFormatted && p.priceFormatted.toLowerCase().includes(q))
-      )
-    })
-  }, [results, searchTerm])
+    let list = results
+
+    // 1. Filter by Property Type (Category)
+    if (committed.propertyType && committed.propertyType !== 'All') {
+      list = list.filter(p => matchesPropertyType(p, committed.propertyType))
+    }
+
+    // 2. Filter by Property Sub Type
+    if (committed.propertySubType && committed.propertySubType !== 'Any') {
+      list = list.filter(p => matchesSubType(p, committed.propertySubType))
+    }
+
+    // 3. Filter by live search bar term
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase()
+      list = list.filter(p => {
+        return (
+          (p.title && p.title.toLowerCase().includes(q)) ||
+          (p.location && p.location.toLowerCase().includes(q)) ||
+          (p.city && p.city.toLowerCase().includes(q)) ||
+          (p.type && p.type.toLowerCase().includes(q)) ||
+          (p.subType && p.subType.toLowerCase().includes(q)) ||
+          (p.phone && p.phone.toLowerCase().includes(q)) ||
+          (p.summary && p.summary.toLowerCase().includes(q)) ||
+          (p.intent && p.intent.toLowerCase().includes(q)) ||
+          (p.category && p.category.toLowerCase().includes(q)) ||
+          (p.description && p.description.toLowerCase().includes(q)) ||
+          (p.priceFormatted && p.priceFormatted.toLowerCase().includes(q))
+        )
+      })
+    }
+
+    return list
+  }, [results, committed.propertyType, committed.propertySubType, searchTerm])
 
   // 📄 Pagination Calculations (20 items per page)
   const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE) || 1

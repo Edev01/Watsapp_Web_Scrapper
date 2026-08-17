@@ -7,10 +7,10 @@ const CITIES = ['All Cities', 'Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'F
 
 const PROPERTY_TYPES = {
   'All': [],
-  'House': ['Single Storey', 'Double Storey', 'Triple Storey', 'Bungalow', 'Villa', 'Farm House'],
-  'Flat': ['Studio', '1 Bed', '2 Bed', '3 Bed', 'Penthouse', 'Lower Portion', 'Upper Portion'],
-  'Plot': ['Residential Plot', 'Commercial Plot', 'Agricultural Land', 'Industrial Land'],
-  'Commercial': ['Office', 'Shop', 'Warehouse', 'Factory', 'Building'],
+  'House': ['Standard', 'Single Storey', 'Double Storey', 'Triple Storey', 'Bungalow', 'Villa', 'Farm House'],
+  'Flat': ['Standard', 'Studio', '1 Bed', '2 Bed', '3 Bed', 'Penthouse', 'Lower Portion', 'Upper Portion'],
+  'Plot': ['Standard', 'Residential Plot', 'Commercial Plot', 'Agricultural Land', 'Industrial Land'],
+  'Commercial': ['Standard', 'Shop', 'Office', 'Warehouse', 'Factory', 'Building'],
 }
 
 const AREA_UNITS = ['Marla', 'Kanal', 'Sq. Ft.', 'Sq. Yd.']
