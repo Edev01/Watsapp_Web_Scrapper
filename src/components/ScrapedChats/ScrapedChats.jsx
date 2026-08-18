@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { API_ENDPOINTS, scrapedChatsApi } from '../../api'
 
 const extractList = (payload) => {
@@ -169,6 +169,8 @@ const EmptyState = ({ title, description }) => (
 )
 
 const ScrapedChats = ({ setToast }) => {
+  const messagesEndRef = useRef(null)
+  const messagesContainerRef = useRef(null)
   const [chats, setChats] = useState([])
   const [messages, setMessages] = useState([])
   const [selectedChatId, setSelectedChatId] = useState('')
@@ -299,6 +301,30 @@ const ScrapedChats = ({ setToast }) => {
   useEffect(() => {
     loadMessages(selectedChatId)
   }, [loadMessages, selectedChatId])
+
+  const scrollToBottom = useCallback((behavior = 'auto') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' })
+    } else if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+    }
+  }, [])
+
+  // 📱 WhatsApp-like Auto Scroll to Bottom on chat open / refresh / messages load
+  useEffect(() => {
+    if (!loadingMessages && messages.length > 0) {
+      const frame = requestAnimationFrame(() => {
+        scrollToBottom('auto')
+      })
+      const timer = setTimeout(() => {
+        scrollToBottom('auto')
+      }, 50)
+      return () => {
+        cancelAnimationFrame(frame)
+        clearTimeout(timer)
+      }
+    }
+  }, [messages, loadingMessages, selectedChatId, scrollToBottom])
 
   const toggleChatSelection = (chat) => {
     if (!chat?.jid || monitoringIds.includes(chat.jid)) return
@@ -654,7 +680,7 @@ const ScrapedChats = ({ setToast }) => {
             )}
           </div>
 
-          <div className="flex-1 bg-slate-50 dark:bg-slate-900/45 p-4 overflow-y-auto">
+          <div ref={messagesContainerRef} className="flex-1 bg-slate-50 dark:bg-slate-900/45 p-4 overflow-y-auto">
             {!selectedChat ? (
               <EmptyState title="Select a chat" description="Messages will appear here" />
             ) : loadingMessages ? (
