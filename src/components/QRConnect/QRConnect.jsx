@@ -44,7 +44,21 @@ const QRConnect = () => {
     }
 
     try {
-      const cacheBustUrl = `${API_URL}${API_URL.includes('?') ? '&' : '?'}t=${Date.now()}`
+      let userId = null
+      try {
+        const saved = localStorage.getItem('currentUser')
+        if (saved) {
+          const userObj = JSON.parse(saved)
+          userId = userObj.id || userObj._id || userObj.userId || null
+        }
+      } catch (e) {}
+
+      const queryParams = new URLSearchParams({ t: Date.now() })
+      if (userId) {
+        queryParams.append('userId', userId)
+      }
+
+      const cacheBustUrl = `${API_URL}?${queryParams.toString()}`
       const res = await fetch(cacheBustUrl, {
         headers: {
           'bypass-tunnel-reminder': 'true',
@@ -73,7 +87,6 @@ const QRConnect = () => {
       setStatus(STATUS.READY)
       setErrorMsg('')
       isInitialFetch.current = false
-
     } catch (err) {
       console.error('QR fetch error:', err.message)
       if (isInitialFetch.current) {
@@ -88,7 +101,7 @@ const QRConnect = () => {
     let socket;
     try {
       socket = io(SOCKET_BASE_URL, {
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
         reconnection: true,
       })
 
