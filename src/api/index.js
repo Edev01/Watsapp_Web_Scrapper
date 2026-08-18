@@ -45,27 +45,58 @@ export const apiRequest = async (url, options = {}) => {
   return payload
 }
 
+export const getLoggedInUserId = () => {
+  try {
+    const saved = localStorage.getItem('currentUser')
+    if (saved) {
+      const u = JSON.parse(saved)
+      return u?.id || u?._id || u?.userId || null
+    }
+  } catch (e) {
+    console.error('Error reading currentUser from localStorage:', e)
+  }
+  return null
+}
+
 export const scrapedChatsApi = {
-  getChats: () => apiRequest(API_ENDPOINTS.scrapedChats),
+  getChats: () => {
+    const userId = getLoggedInUserId()
+    const url = userId ? `${API_ENDPOINTS.scrapedChats}?userId=${userId}` : API_ENDPOINTS.scrapedChats
+    return apiRequest(url)
+  },
   getMessages: (chatId) => {
+    const userId = getLoggedInUserId()
     const params = new URLSearchParams({ chatId })
+    if (userId) params.append('userId', userId)
     return apiRequest(`${API_ENDPOINTS.scrapedChatMessages}?${params.toString()}`)
   },
-  monitorChats: (jids) => apiRequest(API_ENDPOINTS.scrapedChatsMonitor, {
-    method: 'POST',
-    body: JSON.stringify({
-      jids: Array.isArray(jids) ? jids : [jids],
-    }),
-  }),
-  unmonitorChats: (jids) => apiRequest(API_ENDPOINTS.scrapedChatsMonitor, {
-    method: 'POST',
-    body: JSON.stringify({
-      jids: Array.isArray(jids) ? jids : [jids],
-      action: 'unmonitor',
-      isMonitored: false,
-    }),
-  }),
-  getMonitoredChats: () => apiRequest(API_ENDPOINTS.scrapedChatsMonitored),
+  monitorChats: (jids) => {
+    const userId = getLoggedInUserId()
+    return apiRequest(API_ENDPOINTS.scrapedChatsMonitor, {
+      method: 'POST',
+      body: JSON.stringify({
+        jids: Array.isArray(jids) ? jids : [jids],
+        ...(userId ? { userId } : {}),
+      }),
+    })
+  },
+  unmonitorChats: (jids) => {
+    const userId = getLoggedInUserId()
+    return apiRequest(API_ENDPOINTS.scrapedChatsMonitor, {
+      method: 'POST',
+      body: JSON.stringify({
+        jids: Array.isArray(jids) ? jids : [jids],
+        action: 'unmonitor',
+        isMonitored: false,
+        ...(userId ? { userId } : {}),
+      }),
+    })
+  },
+  getMonitoredChats: () => {
+    const userId = getLoggedInUserId()
+    const url = userId ? `${API_ENDPOINTS.scrapedChatsMonitored}?userId=${userId}` : API_ENDPOINTS.scrapedChatsMonitored
+    return apiRequest(url)
+  },
 };
 
 export const propertyApi = {
