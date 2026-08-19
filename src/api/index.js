@@ -6,6 +6,7 @@ export const API_ENDPOINTS = {
   resetPassword: `${BASE_URL}/api/auth/reset-password`,
   users: `${BASE_URL}/api/users`,
   qrLatest: `${BASE_URL}/api/qr/latest`,
+  qrConnectionStatus: `${BASE_URL}/api/qr/connection-status`,
   scrapedChats: `${BASE_URL}/api/scraped-chats`,
   scrapedChatMessages: `${BASE_URL}/api/scraped-chats/messages`,
   scrapedChatsMonitor: `${BASE_URL}/api/scraped-chats/monitor`,
@@ -57,6 +58,19 @@ export const getLoggedInUserId = () => {
   }
   return null
 }
+
+export const qrApi = {
+  getLatestQR: () => {
+    const userId = getLoggedInUserId()
+    const url = userId ? `${API_ENDPOINTS.qrLatest}?userId=${userId}` : API_ENDPOINTS.qrLatest
+    return apiRequest(url)
+  },
+  getConnectionStatus: () => {
+    const userId = getLoggedInUserId()
+    const url = userId ? `${API_ENDPOINTS.qrConnectionStatus}?userId=${userId}` : API_ENDPOINTS.qrConnectionStatus
+    return apiRequest(url)
+  },
+};
 
 export const scrapedChatsApi = {
   getChats: () => {
