@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
   scrapedChatMessages: `${BASE_URL}/api/scraped-chats/messages`,
   scrapedChatsMonitor: `${BASE_URL}/api/scraped-chats/monitor`,
   scrapedChatsMonitored: `${BASE_URL}/api/scraped-chats/monitored`,
+  scrapedChatsDelete: `${BASE_URL}/api/scraped-chats/delete`,
   filterProperties: `${BASE_URL}/api/properties/filter`,
 };
 
@@ -110,6 +111,26 @@ export const scrapedChatsApi = {
     const userId = getLoggedInUserId()
     const url = userId ? `${API_ENDPOINTS.scrapedChatsMonitored}?userId=${userId}` : API_ENDPOINTS.scrapedChatsMonitored
     return apiRequest(url)
+  },
+  deleteChats: (chatIds) => {
+    const userId = getLoggedInUserId()
+    return apiRequest(API_ENDPOINTS.scrapedChatsDelete, {
+      method: 'POST',
+      body: JSON.stringify({
+        chatIds: Array.isArray(chatIds) ? chatIds : [chatIds],
+        ...(userId ? { userId } : {}),
+      }),
+    })
+  },
+  deleteMessages: (messageIds) => {
+    const userId = getLoggedInUserId()
+    return apiRequest(API_ENDPOINTS.scrapedChatsDelete, {
+      method: 'POST',
+      body: JSON.stringify({
+        messageIds: Array.isArray(messageIds) ? messageIds : [messageIds],
+        ...(userId ? { userId } : {}),
+      }),
+    })
   },
 };
 

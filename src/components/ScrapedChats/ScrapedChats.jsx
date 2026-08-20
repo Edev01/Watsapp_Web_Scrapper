@@ -168,6 +168,54 @@ const EmptyState = ({ title, description }) => (
   </div>
 )
 
+const ConfirmModal = ({ isOpen, title, message, confirmText = 'Delete', isLoading = false, onConfirm, onCancel }) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onClick={isLoading ? undefined : onCancel} />
+      <div className="relative bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl max-w-md w-full p-6 space-y-4 z-10 animate-scaleUp">
+        <div className="flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-base font-black text-slate-900 dark:text-slate-100">{title}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{message}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-700">
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={onConfirm}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-white text-xs font-bold bg-rose-600 hover:bg-rose-500 shadow-sm hover:shadow-rose-500/20 disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer"
+          >
+            {isLoading && (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            <span>{confirmText}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const ScrapedChats = ({ setToast }) => {
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
@@ -180,6 +228,16 @@ const ScrapedChats = ({ setToast }) => {
   const [loadingChats, setLoadingChats] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [monitoringIds, setMonitoringIds] = useState([])
+  const [deletingJids, setDeletingJids] = useState([])
+  const [deletingMessageIds, setDeletingMessageIds] = useState([])
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Delete',
+    isLoading: false,
+    onConfirm: () => {},
+  })
   const [error, setError] = useState('')
   const [messageError, setMessageError] = useState('')
   const [lastSyncedAt, setLastSyncedAt] = useState('')
@@ -397,6 +455,105 @@ const ScrapedChats = ({ setToast }) => {
     }
   }
 
+  const closeConfirmModal = () => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false, isLoading: false }))
+  }
+
+  const promptDeleteChats = (jids, chatName = '') => {
+    if (!jids || jids.length === 0) return
+    const isSingle = jids.length === 1
+    const title = isSingle ? `Delete "${chatName || 'Chat'}"?` : `Delete ${jids.length} Selected Chats?`
+    const message = isSingle
+      ? 'This chat and all of its scraped messages will be permanently deleted.'
+      : `All ${jids.length} selected chats and their scraped messages will be permanently deleted.`
+
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      confirmText: isSingle ? 'Delete Chat' : `Delete ${jids.length} Chats`,
+      isLoading: false,
+      onConfirm: () => executeDeleteChats(jids),
+    })
+  }
+
+  const executeDeleteChats = async (jids) => {
+    setConfirmModal(prev => ({ ...prev, isLoading: true }))
+    setDeletingJids(prev => Array.from(new Set([...prev, ...jids])))
+
+    try {
+      await scrapedChatsApi.deleteChats(jids)
+      setToast?.({
+        type: 'success',
+        message: `${jids.length} chat${jids.length > 1 ? 's' : ''} deleted successfully`,
+      })
+
+      setChats(prev => prev.filter(c => !jids.includes(c.jid)))
+      setSelectedJids(prev => prev.filter(id => !jids.includes(id)))
+
+      if (jids.includes(selectedChatId)) {
+        const remaining = chats.filter(c => !jids.includes(c.jid))
+        setSelectedChatId(remaining[0]?.jid || '')
+      }
+
+      closeConfirmModal()
+      await loadChats()
+    } catch (err) {
+      setToast?.({ type: 'error', message: err.message || 'Failed to delete selected chats' })
+      setConfirmModal(prev => ({ ...prev, isLoading: false }))
+    } finally {
+      setDeletingJids(prev => prev.filter(id => !jids.includes(id)))
+    }
+  }
+
+  const promptDeleteMessage = (message) => {
+    if (!message?.id) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Message?',
+      message: 'This scraped message will be permanently deleted.',
+      confirmText: 'Delete Message',
+      isLoading: false,
+      onConfirm: () => executeDeleteMessages([message.id]),
+    })
+  }
+
+  const promptClearChat = (chat) => {
+    if (!messages || messages.length === 0) return
+    const ids = messages.map(m => m.id).filter(Boolean)
+    setConfirmModal({
+      isOpen: true,
+      title: `Clear All Messages for "${chat.name}"?`,
+      message: `All ${messages.length} scraped message(s) in this chat will be permanently deleted.`,
+      confirmText: 'Clear All Messages',
+      isLoading: false,
+      onConfirm: () => executeDeleteMessages(ids, true),
+    })
+  }
+
+  const executeDeleteMessages = async (messageIds, isClearAll = false) => {
+    setConfirmModal(prev => ({ ...prev, isLoading: true }))
+    setDeletingMessageIds(prev => Array.from(new Set([...prev, ...messageIds])))
+
+    try {
+      await scrapedChatsApi.deleteMessages(messageIds)
+      setToast?.({
+        type: 'success',
+        message: isClearAll
+          ? 'All messages cleared successfully'
+          : `${messageIds.length} message${messageIds.length > 1 ? 's' : ''} deleted successfully`,
+      })
+
+      setMessages(prev => prev.filter(m => !messageIds.includes(m.id)))
+      closeConfirmModal()
+    } catch (err) {
+      setToast?.({ type: 'error', message: err.message || 'Failed to delete message(s)' })
+      setConfirmModal(prev => ({ ...prev, isLoading: false }))
+    } finally {
+      setDeletingMessageIds(prev => prev.filter(id => !messageIds.includes(id)))
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto transition-colors">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-5">
@@ -408,12 +565,26 @@ const ScrapedChats = ({ setToast }) => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          {selectedJids.length > 0 && (
+            <button
+              type="button"
+              onClick={() => promptDeleteChats(selectedJids)}
+              disabled={deletingJids.length > 0}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <svg className={`w-4 h-4 ${deletingJids.length > 0 ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete Selected ({selectedJids.length})
+            </button>
+          )}
+
           {selectedMonitoredJids.length > 0 && (
             <button
               type="button"
               onClick={handleUnmonitorSelected}
               disabled={monitoringIds.length > 0}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               <svg className={`w-4 h-4 ${monitoringIds.length > 0 ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -427,7 +598,7 @@ const ScrapedChats = ({ setToast }) => {
               type="button"
               onClick={handleMonitorSelected}
               disabled={monitoringIds.length > 0}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               <svg className={`w-4 h-4 ${monitoringIds.length > 0 ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -440,7 +611,7 @@ const ScrapedChats = ({ setToast }) => {
             type="button"
             onClick={loadChats}
             disabled={loadingChats}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-700 text-white text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-600 disabled:opacity-60 transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-700 text-white text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-600 disabled:opacity-60 transition-colors cursor-pointer"
           >
             <svg className={`w-4 h-4 ${loadingChats ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -618,24 +789,40 @@ const ScrapedChats = ({ setToast }) => {
 
                           <div className="mt-3 flex items-center justify-between gap-3">
                             <p className="text-[11px] text-slate-400 dark:text-slate-500">{formatDateTime(chat.createdAt)}</p>
-                            <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold ${isChecked
-                                ? chat.isMonitored
-                                  ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
-                                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
-                                : chat.isMonitored
-                                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
-                              }`}>
-                              {isMonitoring && (
-                                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                title={`Delete "${chat.name}"`}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  promptDeleteChats([chat.jid], chat.name)
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                              )}
-                              {chat.isMonitored
-                                ? isChecked ? 'Unmonitor?' : 'Monitored'
-                                : isChecked ? 'Selected' : 'Select'}
-                            </span>
+                              </button>
+
+                              <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold ${isChecked
+                                  ? chat.isMonitored
+                                    ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                                  : chat.isMonitored
+                                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
+                                }`}>
+                                {isMonitoring && (
+                                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                  </svg>
+                                )}
+                                {chat.isMonitored
+                                  ? isChecked ? 'Unmonitor?' : 'Monitored'
+                                  : isChecked ? 'Selected' : 'Select'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -672,18 +859,35 @@ const ScrapedChats = ({ setToast }) => {
               </div>
             </div>
             {selectedChat && (
-              <button
-                type="button"
-                onClick={() => loadMessages(selectedChat.jid)}
-                disabled={loadingMessages}
-                className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 text-xs font-bold hover:border-emerald-300 dark:hover:border-emerald-700 disabled:opacity-60 transition-colors shrink-0"
-              >
-                <svg className={`w-4 h-4 ${loadingMessages ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span className="hidden sm:inline">Reload Messages</span>
-                <span className="sm:hidden">Reload</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {messages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => promptClearChat(selectedChat)}
+                    disabled={deletingMessageIds.length > 0}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-900/50 disabled:opacity-60 transition-colors shrink-0 cursor-pointer"
+                  >
+                    <svg className={`w-4 h-4 ${deletingMessageIds.length > 0 ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span className="hidden sm:inline">Clear Messages</span>
+                    <span className="sm:hidden">Clear</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => loadMessages(selectedChat.jid)}
+                  disabled={loadingMessages}
+                  className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 text-xs font-bold hover:border-emerald-300 dark:hover:border-emerald-700 disabled:opacity-60 transition-colors shrink-0 cursor-pointer"
+                >
+                  <svg className={`w-4 h-4 ${loadingMessages ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="hidden sm:inline">Reload Messages</span>
+                  <span className="sm:hidden">Reload</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -711,8 +915,8 @@ const ScrapedChats = ({ setToast }) => {
             ) : (
               <div className="space-y-3">
                 {messages.map(message => (
-                  <div key={message.id} className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[86%] rounded-2xl border p-3 shadow-sm ${message.fromMe
+                  <div key={message.id} className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'} group`}>
+                    <div className={`relative max-w-[86%] rounded-2xl border p-3 shadow-sm transition-all ${message.fromMe
                         ? 'bg-emerald-600 border-emerald-600 text-white'
                         : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
                       }`}>
@@ -720,9 +924,23 @@ const ScrapedChats = ({ setToast }) => {
                         <p className={`text-[10px] font-bold truncate ${message.fromMe ? 'text-emerald-50' : 'text-slate-500 dark:text-slate-400'}`}>
                           {message.fromMe ? 'You' : message.senderName}
                         </p>
-                        <p className={`text-[10px] shrink-0 ${message.fromMe ? 'text-emerald-100' : 'text-slate-400 dark:text-slate-500'}`}>
-                          {formatDateTime(message.createdAt)}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-[10px] shrink-0 ${message.fromMe ? 'text-emerald-100' : 'text-slate-400 dark:text-slate-500'}`}>
+                            {formatDateTime(message.createdAt)}
+                          </p>
+                          <button
+                            type="button"
+                            title="Delete message"
+                            onClick={() => promptDeleteMessage(message)}
+                            className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity cursor-pointer ${
+                              message.fromMe ? 'text-emerald-200 hover:text-white' : 'text-slate-400 hover:text-rose-500'
+                            }`}
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                       <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                         {message.body || `[${message.type}]`}
@@ -739,6 +957,16 @@ const ScrapedChats = ({ setToast }) => {
           </div>
         </section>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        isLoading={confirmModal.isLoading}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={closeConfirmModal}
+      />
     </div>
   )
 }
