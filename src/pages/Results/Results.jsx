@@ -1,11 +1,76 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import PropertyFilters, { DEFAULT_FILTERS } from '../../components/PropertyFilters/PropertyFilters'
+import PropertyFilters, { DEFAULT_FILTERS, formatPriceRangeLabel } from '../../components/PropertyFilters/PropertyFilters'
 import { CardSkeleton } from '../../components/Skeleton/Skeleton'
 import { mlSearchApi } from '../../api'
 
 const ITEMS_PER_PAGE = 20
+
+// 💰 Robust helper to parse and normalize property prices from Pakistani WhatsApp messages
+const parsePropertyPrice = (priceStr, priceVal, rawMessage = '') => {
+  // 1. Try parsing priceStr if available
+  if (typeof priceStr === 'string' && priceStr.trim()) {
+    const s = priceStr.toLowerCase().replace(/,/g, '').trim()
+
+    // 1a. Check for combined Crore and Lakh e.g. "15 Crore 50 Lakh", "15 Cr 50 Lac"
+    const crLakhMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:cr|crore|cror)\s*(?:and)?\s*(\d+(?:\.\d+)?)\s*(?:lac|lakh|lacs)/i)
+    if (crLakhMatch) {
+      return Math.round(parseFloat(crLakhMatch[1]) * 10000000 + parseFloat(crLakhMatch[2]) * 100000)
+    }
+
+    // 1b. Check for Crore e.g. "1.8 Cr", "4.50 cror", "16 crore", "15C"
+    const crMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:cr|crore|cror|c\b)/i)
+    if (crMatch) {
+      return Math.round(parseFloat(crMatch[1]) * 10000000)
+    }
+
+    // 1c. Check for Lac / Lakh e.g. "85 Lac", "1.5 Lac", "3.50 Lac"
+    const lacMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:lac|lakh|lacs|l\b)/i)
+    if (lacMatch) {
+      return Math.round(parseFloat(lacMatch[1]) * 100000)
+    }
+
+    // 1d. Check for thousand / K e.g. "500k", "500 thousand"
+    const kMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:k|thousand|hazar)\b/i)
+    if (kMatch) {
+      return Math.round(parseFloat(kMatch[1]) * 1000)
+    }
+
+    // 1e. Check for explicit numbers like "45000", "325000"
+    const numMatch = s.match(/(\d+(?:\.\d+)?)/)
+    if (numMatch) {
+      const num = parseFloat(numMatch[1])
+      if (num > 0) return num
+    }
+  }
+
+  // 2. Check rawMessage if priceStr is empty/missing
+  if (typeof rawMessage === 'string' && rawMessage.trim()) {
+    const raw = rawMessage.toLowerCase().replace(/,/g, '')
+
+    // Check demand / price in raw message
+    const demandMatch = raw.match(/(?:demand|price|de|dem|pkr|rs\.?)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*(cr|crore|cror|lac|lakh|lacs|c|l|k|thousand)?/i)
+    if (demandMatch) {
+      const val = parseFloat(demandMatch[1])
+      const unit = (demandMatch[2] || '').toLowerCase()
+      if (unit.startsWith('cr') || unit === 'c') return Math.round(val * 10000000)
+      if (unit.startsWith('lac') || unit.startsWith('lakh') || unit === 'l') return Math.round(val * 100000)
+      if (unit.startsWith('k') || unit.startsWith('thous')) return Math.round(val * 1000)
+      if (val >= 1000) return val
+      if (val > 0 && val < 100) {
+        return Math.round(val * 10000000)
+      }
+    }
+  }
+
+  // 3. Fallback to priceVal if it's a valid positive number
+  if (typeof priceVal === 'number' && !isNaN(priceVal) && priceVal > 0) {
+    return priceVal
+  }
+
+  return null
+}
 
 // 🔄 Map ML API response item to normalized property object
 const normalizeMLResult = (item, index) => {
@@ -19,11 +84,12 @@ const normalizeMLResult = (item, index) => {
     .join(' ')
 
   const location = [item.area, item.vicinity].filter(Boolean).join(', ')
+  const parsedPrice = parsePropertyPrice(item.price, item.price_value, item.raw_message)
 
   return {
     id: item.message_id || index,
     title: `${item.size || ''} ${item.property_sub_type || propertyType}`.trim() || 'Property Listing',
-    price: item.price_value || 0,
+    price: parsedPrice,
     priceFormatted: item.price || '',
     area: item.size_value || 0,
     areaUnit: item.size_unit || 'Marla',
@@ -48,7 +114,10 @@ const normalizeMLResult = (item, index) => {
 }
 
 const formatPrice = (price, purpose, priceFormatted) => {
-  if (priceFormatted) return priceFormatted
+  if (priceFormatted && priceFormatted.trim()) return priceFormatted.trim()
+  if (price === null || price === undefined || isNaN(price) || price <= 0) {
+    return 'Price on Call'
+  }
   if (purpose === 'Rent') return `PKR ${price.toLocaleString()}/mo`
   if (price >= 10000000) return `PKR ${(price / 10000000).toFixed(2).replace(/\.?0+$/, '')} Cr`
   if (price >= 100000) return `PKR ${(price / 100000).toFixed(0)} Lac`
@@ -225,11 +294,15 @@ const PropertyTable = ({ properties, onSelect }) => (
               </span>
             </td>
 
-            {/* Location: ONLY City */}
+            {/* Location: Location and City */}
             <td className="px-4 py-3.5 overflow-hidden whitespace-nowrap">
               <div className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-semibold text-xs truncate">
                 <span className="text-emerald-500 shrink-0">📍</span>
-                <span className="truncate" title={p.city || 'Unknown'}>{p.city || 'Unknown'}</span>
+                <span className="truncate" title={p.location || p.city || 'Unknown'}>
+                  {p.city && p.location && !p.location.toLowerCase().includes(p.city.toLowerCase())
+                    ? `${p.location}, ${p.city}`
+                    : p.location || p.city || 'Unknown'}
+                </span>
               </div>
             </td>
 
@@ -705,7 +778,23 @@ const Results = () => {
       list = list.filter(p => matchesSubType(p, committed.propertySubType))
     }
 
-    // 3. Filter by live search bar term
+    // 3. Filter by Price Range (Min & Max)
+    const minPrice = committed.priceMin ? parseFloat(committed.priceMin) : null
+    const maxPrice = committed.priceMax ? parseFloat(committed.priceMax) : null
+
+    if (minPrice !== null || maxPrice !== null) {
+      list = list.filter(p => {
+        // If an explicit price filter is active, exclude listings with no price
+        if (p.price === null || p.price === undefined || isNaN(p.price) || p.price <= 0) {
+          return false
+        }
+        if (minPrice !== null && p.price < minPrice) return false
+        if (maxPrice !== null && p.price > maxPrice) return false
+        return true
+      })
+    }
+
+    // 4. Filter by live search bar term
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase()
       list = list.filter(p => {
@@ -726,7 +815,7 @@ const Results = () => {
     }
 
     return list
-  }, [results, committed.propertyType, committed.propertySubType, searchTerm])
+  }, [results, committed.propertyType, committed.propertySubType, committed.priceMin, committed.priceMax, searchTerm])
 
   // 📄 Pagination Calculations (20 items per page)
   const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE) || 1
@@ -800,7 +889,7 @@ const Results = () => {
               )}
               {(committed.priceMin || committed.priceMax) && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 rounded-lg border border-amber-100 dark:border-amber-900/50">
-                  💰 {committed.priceMin || '0'} to {committed.priceMax || 'Max'}
+                  💰 {committed.priceMin ? `PKR ${formatPriceRangeLabel(committed.priceMin)}` : 'PKR 0'} to {committed.priceMax ? `PKR ${formatPriceRangeLabel(committed.priceMax)}` : 'Any'}
                 </span>
               )}
               {(committed.areaMin || committed.areaMax) && (

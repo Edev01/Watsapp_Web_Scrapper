@@ -130,8 +130,6 @@ export const mlSearchApi = {
     if (filters.purpose && filters.purpose !== 'All') payload.purpose = filters.purpose
     if (filters.city && filters.city !== 'All Cities') payload.city = filters.city
     if (filters.location) payload.location = filters.location
-    if (filters.priceMin) payload.priceMin = parseFloat(filters.priceMin)
-    if (filters.priceMax) payload.priceMax = parseFloat(filters.priceMax)
     if (filters.areaMin || filters.areaMax) {
       if (filters.areaUnit) payload.areaUnit = filters.areaUnit
       if (filters.areaMin) payload.areaMin = parseFloat(filters.areaMin)

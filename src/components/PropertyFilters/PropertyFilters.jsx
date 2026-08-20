@@ -17,7 +17,7 @@ const AREA_UNITS = ['Marla', 'Kanal', 'Sq. Ft.', 'Sq. Yd.']
 const CURRENCIES = ['PKR', 'USD', 'AED']
 const SORT_OPTIONS = ['Newest First', 'Price: Low → High', 'Price: High → Low', 'Area: Small → Large', 'Area: Large → Small']
 
-const formatPriceRangeLabel = (val) => {
+export const formatPriceRangeLabel = (val) => {
   if (!val || val === '0' || val === 0) return '0'
   const num = Number(val)
   if (num >= 10000000) return `${(num / 10000000).toFixed(1).replace(/\.0$/, '')} Cr`
@@ -181,11 +181,13 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
       {/* Row 2: Price Scroller (Full Width) */}
       {(() => {
         const maxLimit = 500000000
+        const isAll = !filters.priceMax && !filters.priceMin
         const currentVal = !filters.priceMax ? maxLimit : Number(filters.priceMax)
         const pct = Math.min(100, Math.max(0, (currentVal / maxLimit) * 100))
 
         const presets = [
-          { label: 'Any Price', value: '' },
+          { label: 'All', value: '' },
+          { label: '< 50 Lac', value: 5000000 },
           { label: '< 1 Cr', value: 10000000 },
           { label: '< 5 Cr', value: 50000000 },
           { label: '< 10 Cr', value: 100000000 },
@@ -193,12 +195,20 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
           { label: '< 50 Cr', value: 500000000 },
         ]
 
+        const getBadgeLabel = () => {
+          if (isAll) return 'All (Any Price)'
+          if (filters.priceMin && filters.priceMax) {
+            return `PKR ${formatPriceRangeLabel(filters.priceMin)} — ${formatPriceRangeLabel(filters.priceMax)}`
+          }
+          return `PKR 0 — ${formatPriceRangeLabel(currentVal)}`
+        }
+
         return (
           <div className="w-full bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 shadow-xs space-y-3 transition-colors">
              <div className="flex justify-between items-center">
               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Price Range (PKR)</span>
               <span className="inline-flex items-center px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 font-extrabold text-xs shadow-xs">
-                {currentVal >= maxLimit ? 'PKR 0 — Any Price (50 Cr+)' : `PKR 0 — ${formatPriceRangeLabel(currentVal)}`}
+                {getBadgeLabel()}
               </span>
             </div>
 
@@ -208,7 +218,7 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
               <div className="absolute left-0 right-0 h-2.5 rounded-full bg-slate-200/80 dark:bg-slate-700/80 overflow-hidden pointer-events-none border border-slate-300/30 dark:border-slate-600/30">
                 <div
                   className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 rounded-full transition-all duration-75"
-                  style={{ width: `${pct}%` }}
+                  style={{ width: isAll ? '100%' : `${pct}%` }}
                 />
               </div>
 
@@ -220,8 +230,12 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
                 step="1000000"
                 value={currentVal}
                 onChange={e => {
-                  const val = Number(e.target.value) >= maxLimit ? '' : e.target.value
-                  set('priceMax', val)
+                  const val = Number(e.target.value)
+                  if (val >= maxLimit) {
+                    set('priceMax', '')
+                  } else {
+                    set('priceMax', String(val))
+                  }
                   set('priceMin', '')
                 }}
                 className="relative z-20 w-full h-5 opacity-0 cursor-pointer"
@@ -230,7 +244,7 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
               {/* Custom Thumb Knob */}
               <div
                 className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 bg-white dark:bg-slate-900 border-2 border-emerald-500 rounded-full shadow-md shadow-emerald-500/20 pointer-events-none z-10 transition-all duration-75 flex items-center justify-center ring-4 ring-emerald-500/10"
-                style={{ left: `${pct}%` }}
+                style={{ left: isAll ? '100%' : `${pct}%` }}
               >
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               </div>
@@ -242,14 +256,14 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
               <div className="flex items-center gap-1.5 flex-wrap">
                 {presets.map(p => {
                   const isActive = p.value === '' 
-                    ? (!filters.priceMax || filters.priceMax == maxLimit)
+                    ? (!filters.priceMax)
                     : Number(filters.priceMax) === p.value
                   return (
                     <button
                       key={p.label}
                       type="button"
                       onClick={() => {
-                        set('priceMax', p.value === maxLimit || p.value === '' ? '' : String(p.value))
+                        set('priceMax', p.value === '' ? '' : String(p.value))
                         set('priceMin', '')
                       }}
                       className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
