@@ -69,7 +69,15 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem('property_search_filters')
-    return saved ? JSON.parse(saved) : DEFAULT_FILTERS
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        return { ...DEFAULT_FILTERS, ...parsed }
+      } catch (e) {
+        return DEFAULT_FILTERS
+      }
+    }
+    return DEFAULT_FILTERS
   })
   const [tabLoading, setTabLoading] = useState(true)
 

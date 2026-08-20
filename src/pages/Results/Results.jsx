@@ -768,17 +768,22 @@ const Results = () => {
   const filteredResults = useMemo(() => {
     let list = results
 
-    // 1. Filter by Property Type (Category)
+    // 1. Filter by Purpose (Buy / Rent / All)
+    if (committed.purpose && committed.purpose !== 'All') {
+      list = list.filter(p => p.purpose && p.purpose.toLowerCase() === committed.purpose.toLowerCase())
+    }
+
+    // 2. Filter by Property Type (Category)
     if (committed.propertyType && committed.propertyType !== 'All') {
       list = list.filter(p => matchesPropertyType(p, committed.propertyType))
     }
 
-    // 2. Filter by Property Sub Type
+    // 3. Filter by Property Sub Type
     if (committed.propertySubType && committed.propertySubType !== 'Any') {
       list = list.filter(p => matchesSubType(p, committed.propertySubType))
     }
 
-    // 3. Filter by Price Range (Min & Max)
+    // 4. Filter by Price Range (Min & Max)
     const minPrice = committed.priceMin ? parseFloat(committed.priceMin) : null
     const maxPrice = committed.priceMax ? parseFloat(committed.priceMax) : null
 
@@ -794,7 +799,23 @@ const Results = () => {
       })
     }
 
-    // 4. Filter by live search bar term
+    // 5. Filter by Area Range (Min & Max & Unit)
+    const minArea = committed.areaMin ? parseFloat(committed.areaMin) : null
+    const maxArea = committed.areaMax ? parseFloat(committed.areaMax) : null
+    const filterUnit = committed.areaUnit && committed.areaUnit !== 'All' ? committed.areaUnit.toLowerCase() : null
+
+    if (minArea !== null || maxArea !== null || filterUnit !== null) {
+      list = list.filter(p => {
+        if (filterUnit && (!p.areaUnit || p.areaUnit.toLowerCase() !== filterUnit)) {
+          return false
+        }
+        if (minArea !== null && (!p.area || p.area < minArea)) return false
+        if (maxArea !== null && (!p.area || p.area > maxArea)) return false
+        return true
+      })
+    }
+
+    // 6. Filter by live search bar term
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase()
       list = list.filter(p => {
@@ -815,7 +836,7 @@ const Results = () => {
     }
 
     return list
-  }, [results, committed.propertyType, committed.propertySubType, committed.priceMin, committed.priceMax, searchTerm])
+  }, [results, committed.purpose, committed.propertyType, committed.propertySubType, committed.priceMin, committed.priceMax, committed.areaMin, committed.areaMax, committed.areaUnit, searchTerm])
 
   // 📄 Pagination Calculations (20 items per page)
   const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE) || 1
@@ -871,12 +892,16 @@ const Results = () => {
           <div className="flex-1">
             <p className="text-[11px] font-bold text-slate-405 dark:text-slate-500 uppercase tracking-wide mb-1">Active Search Filters</p>
             <div className="flex flex-wrap gap-1.5 items-center">
-              <span className="text-xs font-bold px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
-                For {committed.purpose}
-              </span>
-              <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-600">
-                📍 {committed.city}
-              </span>
+              {committed.purpose && (
+                <span className="text-xs font-bold px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
+                  {committed.purpose === 'All' ? 'For All (Buy & Rent)' : `For ${committed.purpose}`}
+                </span>
+              )}
+              {committed.city && (
+                <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-200 dark:border-slate-600">
+                  📍 {committed.city}
+                </span>
+              )}
               {committed.location && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 rounded-lg border border-blue-100 dark:border-blue-900/50">
                   📍 "${committed.location}"
@@ -892,9 +917,9 @@ const Results = () => {
                   💰 {committed.priceMin ? `PKR ${formatPriceRangeLabel(committed.priceMin)}` : 'PKR 0'} to {committed.priceMax ? `PKR ${formatPriceRangeLabel(committed.priceMax)}` : 'Any'}
                 </span>
               )}
-              {(committed.areaMin || committed.areaMax) && (
+              {(committed.areaMin || committed.areaMax || (committed.areaUnit && committed.areaUnit !== 'All')) && (
                 <span className="text-xs font-bold px-2.5 py-1 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 rounded-lg border border-cyan-100 dark:border-cyan-900/50">
-                  📐 {committed.areaMin || '0'} - {committed.areaMax || 'Max'} {committed.areaUnit}
+                  📐 {committed.areaMin || '0'} - {committed.areaMax || 'Max'} {committed.areaUnit !== 'All' ? committed.areaUnit : 'Units'}
                 </span>
               )}
             </div>

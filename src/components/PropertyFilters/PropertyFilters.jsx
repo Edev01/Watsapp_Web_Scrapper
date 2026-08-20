@@ -13,7 +13,7 @@ const PROPERTY_TYPES = {
   'Commercial': ['Standard', 'Shop', 'Office', 'Warehouse', 'Factory', 'Building'],
 }
 
-const AREA_UNITS = ['Marla', 'Kanal', 'Sq. Ft.', 'Sq. Yd.']
+const AREA_UNITS = ['All', 'Marla', 'Kanal', 'Sq. Ft.', 'Sq. Yd.']
 const CURRENCIES = ['PKR', 'USD', 'AED']
 const SORT_OPTIONS = ['Newest First', 'Price: Low → High', 'Price: High → Low', 'Area: Small → Large', 'Area: Large → Small']
 
@@ -26,7 +26,7 @@ export const formatPriceRangeLabel = (val) => {
 }
 
 export const DEFAULT_FILTERS = {
-  purpose: 'Buy',
+  purpose: 'All',
   city: 'All Cities',
   location: '',
   propertyType: 'All',
@@ -35,7 +35,7 @@ export const DEFAULT_FILTERS = {
   priceMax: '',
   areaMin: '',
   areaMax: '',
-  areaUnit: 'Marla',
+  areaUnit: 'All',
   sortBy: 'Newest First',
 }
 
@@ -148,12 +148,12 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
         </button>
       </div>
 
-      {/* Row 1: Purpose + City + Sort By */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+      {/* Row 1: Purpose + City (Sort By is hidden but preserved) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
         <div>
           <Label>Purpose</Label>
           <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 w-full transition-colors">
-            {['Buy', 'Rent'].map(p => (
+            {['All', 'Buy', 'Rent'].map(p => (
               <button
                 type="button"
                 key={p}
@@ -172,7 +172,8 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
           <Label>City</Label>
           <FieldSelect value={filters.city} onChange={v => set('city', v)} options={CITIES} />
         </div>
-        <div>
+        {/* Sort By: Hidden as requested, state preserved */}
+        <div className="hidden">
           <Label>Sort By</Label>
           <FieldSelect value={filters.sortBy} onChange={v => set('sortBy', v)} options={SORT_OPTIONS} />
         </div>
@@ -314,15 +315,15 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <Label>Area Unit</Label>
-          <FieldSelect value={filters.areaUnit} onChange={v => set('areaUnit', v)} options={AREA_UNITS} />
+          <FieldSelect value={filters.areaUnit || 'All'} onChange={v => set('areaUnit', v)} options={AREA_UNITS} />
         </div>
         <div>
-          <Label>Area Min ({filters.areaUnit})</Label>
-          <FieldInput value={filters.areaMin} onChange={v => set('areaMin', v)} placeholder="Min area" type="number" />
+          <Label>Area Min {filters.areaUnit && filters.areaUnit !== 'All' ? `(${filters.areaUnit})` : '(All)'}</Label>
+          <FieldInput value={filters.areaMin} onChange={v => set('areaMin', v)} placeholder="All / Min area" type="number" />
         </div>
         <div>
-          <Label>Area Max ({filters.areaUnit})</Label>
-          <FieldInput value={filters.areaMax} onChange={v => set('areaMax', v)} placeholder="Max area" type="number" />
+          <Label>Area Max {filters.areaUnit && filters.areaUnit !== 'All' ? `(${filters.areaUnit})` : '(All)'}</Label>
+          <FieldInput value={filters.areaMax} onChange={v => set('areaMax', v)} placeholder="All / Max area" type="number" />
         </div>
       </div>
 
