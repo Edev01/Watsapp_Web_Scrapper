@@ -284,7 +284,14 @@ const ScrapedChats = ({ setToast }) => {
 
     try {
       const payload = await scrapedChatsApi.getMessages(chatId)
-      const list = extractList(payload).map(normalizeMessage)
+      const list = extractList(payload)
+        .map(normalizeMessage)
+        .sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          if (timeA !== timeB) return timeA - timeB
+          return (Number(a.id) || 0) - (Number(b.id) || 0)
+        })
       setMessages(list)
     } catch (err) {
       setMessages([])
@@ -726,6 +733,7 @@ const ScrapedChats = ({ setToast }) => {
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
             )}
           </div>
