@@ -150,14 +150,27 @@ export const mlSearchApi = {
 
     if (filters.purpose && filters.purpose !== 'All') payload.purpose = filters.purpose
     if (filters.city && filters.city !== 'All Cities') payload.city = filters.city
-    if (filters.location) payload.location = filters.location
+    
+    // Pass user input to ML AI 'query' field so normalization and typo-tolerance work
+    const searchParam = (filters.query || filters.location || '').trim()
+    if (searchParam) {
+      payload.query = searchParam
+    }
+
+    if (filters.propertyType && filters.propertyType !== 'All') payload.propertyType = filters.propertyType
+    if (filters.propertySubType && filters.propertySubType !== 'Any' && filters.propertySubType !== 'Standard') {
+      payload.propertySubType = filters.propertySubType
+    }
+
+    if (filters.priceMin) payload.priceMin = parseFloat(filters.priceMin)
+    if (filters.priceMax) payload.priceMax = parseFloat(filters.priceMax)
+
     if (filters.areaMin || filters.areaMax) {
-      if (filters.areaUnit) payload.areaUnit = filters.areaUnit
+      if (filters.areaUnit && filters.areaUnit !== 'All') payload.areaUnit = filters.areaUnit
       if (filters.areaMin) payload.areaMin = parseFloat(filters.areaMin)
       if (filters.areaMax) payload.areaMax = parseFloat(filters.areaMax)
     }
     if (filters.sortBy) payload.sortBy = filters.sortBy
-    if (filters.query) payload.query = filters.query
 
     payload.limit = filters.limit || 10000
 
