@@ -220,6 +220,7 @@ const ScrapedChats = ({ setToast }) => {
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
   const dropdownRef = useRef(null)
+  const chatListContainerRef = useRef(null)
   const [chats, setChats] = useState([])
   const [messages, setMessages] = useState([])
   const [selectedChatId, setSelectedChatId] = useState('')
@@ -232,6 +233,7 @@ const ScrapedChats = ({ setToast }) => {
   const [deletingJids, setDeletingJids] = useState([])
   const [deletingMessageIds, setDeletingMessageIds] = useState([])
   const [openDropdownJid, setOpenDropdownJid] = useState(null)
+  const [dropdownPlacement, setDropdownPlacement] = useState('down')
   const [pinnedJids, setPinnedJids] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('pinned_chat_jids') || '[]')
@@ -688,6 +690,30 @@ const ScrapedChats = ({ setToast }) => {
     promptDeleteChats([chat.jid], chat.name)
   }
 
+  const handleOpenDropdown = (event, chat) => {
+    event.stopPropagation()
+    if (openDropdownJid === chat.jid) {
+      setOpenDropdownJid(null)
+      return
+    }
+
+    const buttonRect = event.currentTarget.getBoundingClientRect()
+    const containerRect = chatListContainerRef.current?.getBoundingClientRect()
+
+    const spaceBelow = containerRect
+      ? containerRect.bottom - buttonRect.bottom
+      : window.innerHeight - buttonRect.bottom
+
+    // If less than 230px space below, flip upwards (dropup) like WhatsApp Web!
+    if (spaceBelow < 230) {
+      setDropdownPlacement('up')
+    } else {
+      setDropdownPlacement('down')
+    }
+
+    setOpenDropdownJid(chat.jid)
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto transition-colors">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-5">
@@ -826,7 +852,7 @@ const ScrapedChats = ({ setToast }) => {
                   : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'
                 }`}>
                 {allVisibleSelected && (
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -838,7 +864,7 @@ const ScrapedChats = ({ setToast }) => {
             </p>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div ref={chatListContainerRef} className="flex-1 overflow-y-auto">
             {loadingChats ? (
               <div className="p-4 space-y-3 animate-pulse">
                 {[1, 2, 3].map(item => (
@@ -910,21 +936,24 @@ const ScrapedChats = ({ setToast }) => {
                         </button>
                         <ChatAvatar chat={chat} />
                         <div className="flex-1 min-w-0">
-                          {/* Top row: Name + Pin Icon + Time */}
+                          {/* Top row: Name + Time */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex items-center gap-1.5 flex-1">
+                              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{chat.name}</p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {/* WhatsApp Pinned chat indicator icon */}
                               {isPinned && (
-                                <span title="Pinned Chat" className="text-amber-500 shrink-0">
-                                  <svg className="w-3.5 h-3.5 fill-amber-500/20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={1.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 13l-4-4m0 0l-5 5-4-1-1 4 4-1 5-5m5-3l-2-2a2 2 0 00-2.828 0l-1.414 1.414 4.242 4.242 1.414-1.414a2 2 0 000-2.828z" />
+                                <span title="Pinned chat" className="text-slate-400 dark:text-slate-400">
+                                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" fill="currentColor">
+                                    <path d="M16 3H8C7.45 3 7 3.45 7 4V5.5C7 6.05 7.45 6.5 8 6.5H9V11.5L7.29 13.21C7.11 13.39 7 13.65 7 13.91V15.5C7 16.05 7.45 16.5 8 16.5H11V21C11 21.55 11.45 22 12 22C12.55 22 13 21.55 13 21V16.5H16C16.55 16.5 17 16.05 17 15.5V13.91C17 13.65 16.89 13.39 16.71 13.21L15 11.5V6.5H16C16.55 6.5 17 6.05 17 5.5V4C17 3.45 16.55 3 16 3Z" />
                                   </svg>
                                 </span>
                               )}
-                              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{chat.name}</p>
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                {formatDateTime(chat.createdAt)}
+                              </p>
                             </div>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium shrink-0">
-                              {formatDateTime(chat.createdAt)}
-                            </p>
                           </div>
 
                           {/* Bottom row: Status / JID + Dropdown Trigger Button */}
@@ -944,10 +973,7 @@ const ScrapedChats = ({ setToast }) => {
                               <button
                                 type="button"
                                 title="Chat options"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  setOpenDropdownJid(prev => prev === chat.jid ? null : chat.jid)
-                                }}
+                                onClick={(event) => handleOpenDropdown(event, chat)}
                                 className={`p-1.5 rounded-full transition-all cursor-pointer ${
                                   isDropdownOpen
                                     ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 opacity-100'
@@ -959,22 +985,32 @@ const ScrapedChats = ({ setToast }) => {
                                 </svg>
                               </button>
 
-                              {/* WhatsApp Web Style Dropdown Menu */}
+                              {/* WhatsApp Web Style Dropdown Menu (Smart Up/Down Positioning) */}
                               {isDropdownOpen && (
                                 <div
                                   ref={dropdownRef}
                                   onClick={(event) => event.stopPropagation()}
-                                  className="absolute right-0 top-8 z-50 min-w-[200px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl py-1.5 animate-fadeIn backdrop-blur-md"
+                                  className={`absolute right-0 z-50 min-w-[200px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-fadeIn backdrop-blur-md ${
+                                    dropdownPlacement === 'up'
+                                      ? 'bottom-8 origin-bottom-right'
+                                      : 'top-8 origin-top-right'
+                                  }`}
                                 >
-                                  {/* 1. Pin Chat / Unpin Chat */}
+                                  {/* 1. Pin Chat / Unpin Chat (Exact WhatsApp Web Pin Icon) */}
                                   <button
                                     type="button"
                                     onClick={() => togglePinChat(chat)}
                                     className="w-full px-3.5 py-2.5 flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
                                   >
-                                    <svg className={`w-4 h-4 shrink-0 ${isPinned ? 'text-amber-500 fill-amber-500/20' : 'text-slate-400 dark:text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 13l-4-4m0 0l-5 5-4-1-1 4 4-1 5-5m5-3l-2-2a2 2 0 00-2.828 0l-1.414 1.414 4.242 4.242 1.414-1.414a2 2 0 000-2.828z" />
-                                    </svg>
+                                    {isPinned ? (
+                                      <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 fill-current text-slate-400 dark:text-slate-300" fill="currentColor">
+                                        <path d="M2.71 3.29a1 1 0 0 0 0 1.41l2.43 2.43C5.05 7.37 5 7.68 5 8v1.5a1 1 0 0 0 1 1h.5v2.24l-1.71 1.71A1 1 0 0 0 4.5 15.15V16.5a1 1 0 0 0 1 1H11V21a1 1 0 0 0 2 0v-3.5h3.15l3.14 3.14a1 1 0 0 0 1.41-1.41L4.12 3.29a1 1 0 0 0-1.41 0ZM14 11.5V6.5h1.5a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8.5a1 1 0 0 0-.6.2l6.1 6.1Z" />
+                                      </svg>
+                                    ) : (
+                                      <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 fill-current text-slate-400 dark:text-slate-300" fill="currentColor">
+                                        <path d="M16 3H8C7.45 3 7 3.45 7 4V5.5C7 6.05 7.45 6.5 8 6.5H9V11.5L7.29 13.21C7.11 13.39 7 13.65 7 13.91V15.5C7 16.05 7.45 16.5 8 16.5H11V21C11 21.55 11.45 22 12 22C12.55 22 13 21.55 13 21V16.5H16C16.55 16.5 17 16.05 17 15.5V13.91C17 13.65 16.89 13.39 16.71 13.21L15 11.5V6.5H16C16.55 6.5 17 6.05 17 5.5V4C17 3.45 16.55 3 16 3Z" />
+                                      </svg>
+                                    )}
                                     <span>{isPinned ? 'Unpin chat' : 'Pin chat'}</span>
                                   </button>
 
@@ -996,7 +1032,7 @@ const ScrapedChats = ({ setToast }) => {
                                     onClick={() => handleClearChatFromDropdown(chat)}
                                     className="w-full px-3.5 py-2.5 flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
                                   >
-                                    <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                     <span>Clear chat</span>
