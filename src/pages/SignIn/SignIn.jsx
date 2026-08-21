@@ -85,6 +85,10 @@ const SignIn = ({ setAuthUser, setToast }) => {
             token
           };
 
+          // Always reset active tab on fresh login so Admin lands on Overview
+          localStorage.setItem('admin_active_tab', 'overview');
+          localStorage.setItem('user_active_tab', 'search');
+
           setAuthUser(loggedInUser);
           setToast({ type: 'success', message: `Welcome back, ${fullName}!` });
           navigate('/dashboard');
@@ -104,6 +108,8 @@ const SignIn = ({ setAuthUser, setToast }) => {
               token: 'demo-local-token'
             }
             localStorage.setItem('authToken', 'demo-local-token')
+            localStorage.setItem('admin_active_tab', 'overview');
+            localStorage.setItem('user_active_tab', 'search');
             setAuthUser(loggedInUser)
             setToast({ type: 'success', message: `Welcome back, ${foundLocal.fullName}!` })
             navigate('/dashboard')
@@ -130,6 +136,8 @@ const SignIn = ({ setAuthUser, setToast }) => {
             token: 'demo-local-token'
           }
           localStorage.setItem('authToken', 'demo-local-token')
+          localStorage.setItem('admin_active_tab', 'overview');
+          localStorage.setItem('user_active_tab', 'search');
           setAuthUser(loggedInUser)
           setToast({ type: 'success', message: `Welcome back, ${foundLocal.fullName}!` })
           navigate('/dashboard')

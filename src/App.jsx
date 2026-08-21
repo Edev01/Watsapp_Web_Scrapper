@@ -145,6 +145,8 @@ function App() {
 
   const handleSignOut = () => {
     localStorage.removeItem('authToken')
+    localStorage.removeItem('admin_active_tab')
+    localStorage.removeItem('user_active_tab')
     setAuthUser(null)
     setToast({ type: 'success', message: 'Logged out successfully' })
   }

@@ -567,6 +567,17 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
 
+  // Ensure form is always clean and reset on mount
+  useEffect(() => {
+    setFormData({
+      fullName: '',
+      email: '',
+      password: '',
+      phone_number: ''
+    })
+    setErrors({})
+  }, [])
+
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
@@ -725,7 +736,11 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 shadow-sm transition-colors">
-        <form onSubmit={handleSubmit} className="space-y-5 text-left">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-5 text-left">
+          {/* Hidden inputs to prevent aggressive browser password manager autofill */}
+          <input type="text" name="prevent_autofill_user" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
+          <input type="password" name="prevent_autofill_pass" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
+
           {/* Full Name */}
           <div>
             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Full Name</label>
@@ -738,6 +753,8 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
               <input
                 type="text"
                 name="fullName"
+                id="create-user-fullname"
+                autoComplete="off"
                 value={formData.fullName}
                 onChange={handleChange}
                 className={`w-full pl-11 pr-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
@@ -768,6 +785,11 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
               <input
                 type="email"
                 name="email"
+                id="create-user-email"
+                autoComplete="new-email"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck="false"
                 value={formData.email}
                 onChange={handleChange}
                 className={`w-full pl-11 pr-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
@@ -798,6 +820,8 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
+                id="create-user-password"
+                autoComplete="new-password"
                 value={formData.password}
                 onChange={handleChange}
                 className={`w-full pl-11 pr-11 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
@@ -844,6 +868,8 @@ const AdminCreateUserPanel = ({ setToast, onUserCreated }) => {
               <input
                 type="text"
                 name="phone_number"
+                id="create-user-phone"
+                autoComplete="off"
                 value={formData.phone_number}
                 onChange={handleChange}
                 className={`w-full pl-11 pr-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 dark:text-white bg-white dark:bg-slate-700 ${
