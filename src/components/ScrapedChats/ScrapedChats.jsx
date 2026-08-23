@@ -517,10 +517,11 @@ const ScrapedChats = ({ setToast }) => {
   }, [loadMessages, selectedChatId])
 
   const scrollToBottom = useCallback((behavior = 'auto') => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' })
-    } else if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior
+      })
     }
   }, [])
 
@@ -540,11 +541,22 @@ const ScrapedChats = ({ setToast }) => {
     }
   }, [messages, loadingMessages, selectedChatId, scrollToBottom, isSearchOpen])
 
-  // 🎯 Scroll to message and flash highlight (WhatsApp Style)
+  // 🎯 Scroll ONLY inside the messages container and flash highlight (WhatsApp Style)
   const handleJumpToMessage = (messageId) => {
     const el = document.getElementById(`msg-${messageId}`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const container = messagesContainerRef.current
+    if (el && container) {
+      // Calculate target position relative to the messages container ONLY
+      const containerRect = container.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+
+      const targetScrollTop = container.scrollTop + (elRect.top - containerRect.top) - (container.clientHeight / 2) + (el.clientHeight / 2)
+
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'smooth'
+      })
+
       setHighlightedMsgId(messageId)
 
       if (highlightTimeoutRef.current) {
