@@ -122,15 +122,53 @@ const formatDateTime = (value) => {
   })
 }
 
+const formatTimeOnly = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+
+  return date.toLocaleString('en-PK', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 const getInitial = (value) => {
   const cleaned = String(value || '').trim()
   return cleaned ? cleaned.charAt(0).toUpperCase() : '?'
 }
 
+// 🔤 Highlight matching text helper
+const HighlightMatchedText = ({ text = '', query = '' }) => {
+  const trimmed = query.trim()
+  if (!trimmed || !text) return <span>{text}</span>
+
+  const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escapedQuery})`, 'gi')
+  const parts = String(text).split(regex)
+
+  return (
+    <span>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark
+            key={i}
+            className="bg-emerald-200 dark:bg-emerald-500/40 text-emerald-950 dark:text-emerald-100 font-bold px-0.5 rounded transition-colors"
+          >
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </span>
+  )
+}
+
 const ChatAvatar = ({ chat }) => {
   const [failed, setFailed] = useState(false)
 
-  if (chat.avatar && !failed) {
+  if (chat?.avatar && !failed) {
     return (
       <img
         src={chat.avatar}
@@ -143,7 +181,7 @@ const ChatAvatar = ({ chat }) => {
 
   return (
     <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60 flex items-center justify-center text-sm font-black shrink-0">
-      {getInitial(chat.name || chat.jid)}
+      {getInitial(chat?.name || chat?.jid)}
     </div>
   )
 }
@@ -220,7 +258,11 @@ const ScrapedChats = ({ setToast }) => {
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
   const dropdownRef = useRef(null)
+  const chatHeaderMenuRef = useRef(null)
   const chatListContainerRef = useRef(null)
+  const searchInputRef = useRef(null)
+  const highlightTimeoutRef = useRef(null)
+
   const [chats, setChats] = useState([])
   const [messages, setMessages] = useState([])
   const [selectedChatId, setSelectedChatId] = useState('')
@@ -234,6 +276,15 @@ const ScrapedChats = ({ setToast }) => {
   const [deletingMessageIds, setDeletingMessageIds] = useState([])
   const [openDropdownJid, setOpenDropdownJid] = useState(null)
   const [dropdownPlacement, setDropdownPlacement] = useState('down')
+  
+  // 📱 WhatsApp Web Feature States
+  const [chatHeaderMenuOpen, setChatHeaderMenuOpen] = useState(false)
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedMessageIds, setSelectedMessageIds] = useState([])
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [messageSearchQuery, setMessageSearchQuery] = useState('')
+  const [highlightedMsgId, setHighlightedMsgId] = useState(null)
+
   const [pinnedJids, setPinnedJids] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('pinned_chat_jids') || '[]')
@@ -241,6 +292,7 @@ const ScrapedChats = ({ setToast }) => {
       return []
     }
   })
+
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
@@ -259,22 +311,62 @@ const ScrapedChats = ({ setToast }) => {
     localStorage.setItem('pinned_chat_jids', JSON.stringify(pinnedJids))
   }, [pinnedJids])
 
-  // Close dropdown on click outside
+  // Close dropdowns & menus on click outside or Escape key
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setOpenDropdownJid(null)
       }
+      if (chatHeaderMenuRef.current && !chatHeaderMenuRef.current.contains(e.target)) {
+        setChatHeaderMenuOpen(false)
+      }
     }
-    if (openDropdownJid) {
-      document.addEventListener('mousedown', handleClickOutside)
-      document.addEventListener('touchstart', handleClickOutside)
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setOpenDropdownJid(null)
+        setChatHeaderMenuOpen(false)
+        if (isSelectionMode) {
+          setIsSelectionMode(false)
+          setSelectedMessageIds([])
+        }
+        if (isSearchOpen) {
+          setIsSearchOpen(false)
+          setMessageSearchQuery('')
+        }
+      }
     }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('touchstart', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [openDropdownJid])
+  }, [isSelectionMode, isSearchOpen])
+
+  // Auto focus search input when search drawer opens
+  useEffect(() => {
+    if (isSearchOpen) {
+      setTimeout(() => {
+        searchInputRef.current?.focus()
+      }, 100)
+    }
+  }, [isSearchOpen])
+
+  // Reset chat-specific states on chat change
+  const handleSelectChat = (jid) => {
+    setSelectedChatId(jid)
+    setShowMobileMessages(true)
+    setIsSelectionMode(false)
+    setSelectedMessageIds([])
+    setIsSearchOpen(false)
+    setMessageSearchQuery('')
+    setChatHeaderMenuOpen(false)
+  }
 
   const selectedChat = useMemo(
     () => chats.find(chat => chat.jid === selectedChatId) || null,
@@ -289,6 +381,11 @@ const ScrapedChats = ({ setToast }) => {
   const selectedJidSet = useMemo(
     () => new Set(selectedJids),
     [selectedJids]
+  )
+
+  const selectedMsgIdSet = useMemo(
+    () => new Set(selectedMessageIds),
+    [selectedMessageIds]
   )
 
   const visibleChats = useMemo(() => {
@@ -326,6 +423,16 @@ const ScrapedChats = ({ setToast }) => {
 
   const allVisibleSelected = visibleChats.length > 0
     && visibleChats.every(chat => selectedJidSet.has(chat.jid))
+
+  // 🔍 Filtered messages for search side drawer
+  const searchResults = useMemo(() => {
+    const q = messageSearchQuery.trim().toLowerCase()
+    if (!q) return []
+    return messages.filter(m => (
+      (m.body && m.body.toLowerCase().includes(q)) ||
+      (m.senderName && m.senderName.toLowerCase().includes(q))
+    ))
+  }, [messages, messageSearchQuery])
 
   const loadChats = useCallback(async () => {
     setLoadingChats(true)
@@ -417,9 +524,9 @@ const ScrapedChats = ({ setToast }) => {
     }
   }, [])
 
-  // 📱 WhatsApp-like Auto Scroll to Bottom on chat open / refresh / messages load
+  // 📱 WhatsApp-like Auto Scroll to Bottom on chat open / messages load
   useEffect(() => {
-    if (!loadingMessages && messages.length > 0) {
+    if (!loadingMessages && messages.length > 0 && !isSearchOpen) {
       const frame = requestAnimationFrame(() => {
         scrollToBottom('auto')
       })
@@ -431,7 +538,60 @@ const ScrapedChats = ({ setToast }) => {
         clearTimeout(timer)
       }
     }
-  }, [messages, loadingMessages, selectedChatId, scrollToBottom])
+  }, [messages, loadingMessages, selectedChatId, scrollToBottom, isSearchOpen])
+
+  // 🎯 Scroll to message and flash highlight (WhatsApp Style)
+  const handleJumpToMessage = (messageId) => {
+    const el = document.getElementById(`msg-${messageId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setHighlightedMsgId(messageId)
+
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current)
+      }
+
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedMsgId(null)
+      }, 2500)
+    }
+  }
+
+  // ✅ Toggle Single Message Selection
+  const toggleSelectMessage = (messageId) => {
+    setSelectedMessageIds(prev =>
+      prev.includes(messageId)
+        ? prev.filter(id => id !== messageId)
+        : [...prev, messageId]
+    )
+  }
+
+  // ✅ Toggle Select All Messages
+  const toggleSelectAllMessages = () => {
+    if (selectedMessageIds.length === messages.length) {
+      setSelectedMessageIds([])
+    } else {
+      setSelectedMessageIds(messages.map(m => m.id))
+    }
+  }
+
+  // ✕ Exit Selection Mode
+  const handleCancelSelectionMode = () => {
+    setIsSelectionMode(false)
+    setSelectedMessageIds([])
+  }
+
+  // ✕ Close Active Chat (WhatsApp Style)
+  const handleCloseChat = () => {
+    setChatHeaderMenuOpen(false)
+    setSelectedChatId('')
+    setIsSearchOpen(false)
+    setMessageSearchQuery('')
+    setIsSelectionMode(false)
+    setSelectedMessageIds([])
+    setShowMobileMessages(false)
+    setToast?.({ type: 'info', message: 'Chat closed' })
+  }
 
   const toggleChatSelection = (chat) => {
     if (!chat?.jid || monitoringIds.includes(chat.jid)) return
@@ -536,6 +696,9 @@ const ScrapedChats = ({ setToast }) => {
       if (jids.includes(selectedChatId)) {
         const remaining = chats.filter(c => !jids.includes(c.jid))
         setSelectedChatId(remaining[0]?.jid || '')
+        setIsSelectionMode(false)
+        setSelectedMessageIds([])
+        setIsSearchOpen(false)
       }
 
       closeConfirmModal()
@@ -560,8 +723,24 @@ const ScrapedChats = ({ setToast }) => {
     })
   }
 
+  const promptDeleteSelectedMessages = () => {
+    if (selectedMessageIds.length === 0) return
+    const isSingle = selectedMessageIds.length === 1
+    setConfirmModal({
+      isOpen: true,
+      title: isSingle ? 'Delete 1 Selected Message?' : `Delete ${selectedMessageIds.length} Selected Messages?`,
+      message: `The selected ${selectedMessageIds.length} message(s) will be permanently deleted.`,
+      confirmText: 'Delete Messages',
+      isLoading: false,
+      onConfirm: () => executeDeleteMessages(selectedMessageIds),
+    })
+  }
+
   const promptClearChat = (chat) => {
-    if (!messages || messages.length === 0) return
+    if (!messages || messages.length === 0) {
+      setToast?.({ type: 'info', message: 'No messages to clear in this chat' })
+      return
+    }
     const ids = messages.map(m => m.id).filter(Boolean)
     setConfirmModal({
       isOpen: true,
@@ -587,6 +766,8 @@ const ScrapedChats = ({ setToast }) => {
       })
 
       setMessages(prev => prev.filter(m => !messageIds.includes(m.id)))
+      setSelectedMessageIds([])
+      setIsSelectionMode(false)
       closeConfirmModal()
     } catch (err) {
       setToast?.({ type: 'error', message: err.message || 'Failed to delete message(s)' })
@@ -704,7 +885,6 @@ const ScrapedChats = ({ setToast }) => {
       ? containerRect.bottom - buttonRect.bottom
       : window.innerHeight - buttonRect.bottom
 
-    // If less than 230px space below, flip upwards (dropup) like WhatsApp Web!
     if (spaceBelow < 230) {
       setDropdownPlacement('up')
     } else {
@@ -795,6 +975,7 @@ const ScrapedChats = ({ setToast }) => {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-5">
+        {/* Left Side: Chats List */}
         <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${showMobileMessages ? 'hidden xl:flex' : 'flex'
           }`}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
@@ -896,15 +1077,11 @@ const ScrapedChats = ({ setToast }) => {
                       key={chat.jid}
                       role="button"
                       tabIndex={0}
-                      onClick={() => {
-                        setSelectedChatId(chat.jid)
-                        setShowMobileMessages(true)
-                      }}
+                      onClick={() => handleSelectChat(chat.jid)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault()
-                          setSelectedChatId(chat.jid)
-                          setShowMobileMessages(true)
+                          handleSelectChat(chat.jid)
                         }
                       }}
                       className={`w-full text-left p-3.5 transition-all relative group cursor-pointer ${isSelected
@@ -942,7 +1119,6 @@ const ScrapedChats = ({ setToast }) => {
                               <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{chat.name}</p>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
-                              {/* WhatsApp Pinned chat indicator icon */}
                               {isPinned && (
                                 <span title="Pinned chat" className="text-slate-400 dark:text-slate-400">
                                   <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" fill="currentColor">
@@ -996,7 +1172,7 @@ const ScrapedChats = ({ setToast }) => {
                                       : 'top-8 origin-top-right'
                                   }`}
                                 >
-                                  {/* 1. Pin Chat / Unpin Chat (Exact WhatsApp Web Pin Icon) */}
+                                  {/* 1. Pin Chat / Unpin Chat */}
                                   <button
                                     type="button"
                                     onClick={() => togglePinChat(chat)}
@@ -1026,7 +1202,7 @@ const ScrapedChats = ({ setToast }) => {
                                     <span>{chat.isMonitored ? 'Unmonitor' : 'Monitor'}</span>
                                   </button>
 
-                                  {/* 3. Clear Chat / Messages */}
+                                  {/* 3. Clear Chat */}
                                   <button
                                     type="button"
                                     onClick={() => handleClearChatFromDropdown(chat)}
@@ -1065,9 +1241,11 @@ const ScrapedChats = ({ setToast }) => {
           </div>
         </section>
 
-        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${showMobileMessages ? 'flex' : 'hidden xl:flex'
+        {/* Right Side: Active Chat Messages with WhatsApp Web Header 3-Dots, Selection Mode & Search Drawer */}
+        <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] relative ${showMobileMessages ? 'flex' : 'hidden xl:flex'
           }`}>
-          <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-row items-center justify-between gap-3">
+          {/* Active Chat Header */}
+          <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-700 flex flex-row items-center justify-between gap-3 bg-white dark:bg-slate-800 z-10">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
@@ -1089,100 +1267,425 @@ const ScrapedChats = ({ setToast }) => {
                 </p>
               </div>
             </div>
-            {selectedChat && (
-              <div className="flex items-center gap-2">
-                {messages.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => promptClearChat(selectedChat)}
-                    disabled={deletingMessageIds.length > 0}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-900/50 disabled:opacity-60 transition-colors shrink-0 cursor-pointer"
-                  >
-                    <svg className={`w-4 h-4 ${deletingMessageIds.length > 0 ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    <span className="hidden sm:inline">Clear Messages</span>
-                    <span className="sm:hidden">Clear</span>
-                  </button>
-                )}
 
+            {selectedChat && (
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {/* 🔍 Quick Search Button */}
                 <button
                   type="button"
+                  title="Search messages in chat"
+                  onClick={() => {
+                    setIsSearchOpen(prev => !prev)
+                    setChatHeaderMenuOpen(false)
+                  }}
+                  className={`p-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    isSearchOpen
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </button>
+
+                {/* 🔄 Reload Messages Button */}
+                <button
+                  type="button"
+                  title="Reload Messages"
                   onClick={() => loadMessages(selectedChat.jid)}
                   disabled={loadingMessages}
-                  className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 text-xs font-bold hover:border-emerald-300 dark:hover:border-emerald-700 disabled:opacity-60 transition-colors shrink-0 cursor-pointer"
+                  className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 text-slate-700 dark:text-slate-300 hover:border-emerald-300 dark:hover:border-emerald-700 disabled:opacity-60 transition-colors cursor-pointer"
                 >
                   <svg className={`w-4 h-4 ${loadingMessages ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span className="hidden sm:inline">Reload Messages</span>
-                  <span className="sm:hidden">Reload</span>
                 </button>
+
+                {/* 📱 3-DOTS HEADER MENU (Exact WhatsApp Web Style) */}
+                <div className="relative" ref={chatHeaderMenuRef}>
+                  <button
+                    type="button"
+                    title="Menu"
+                    onClick={() => setChatHeaderMenuOpen(prev => !prev)}
+                    className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                      chatHeaderMenuOpen
+                        ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {/* WhatsApp 3 Vertical Dots Icon */}
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current text-slate-600 dark:text-slate-300" fill="currentColor">
+                      <path d="M12 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm0 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm0 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+                    </svg>
+                  </button>
+
+                  {/* 3-DOTS DROPDOWN MENU */}
+                  {chatHeaderMenuOpen && (
+                    <div className="absolute right-0 top-11 z-50 min-w-[220px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/90 rounded-2xl shadow-2xl py-2 animate-scaleUp origin-top-right backdrop-blur-md">
+                      {/* 1. Search with icon */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatHeaderMenuOpen(false)
+                          setIsSearchOpen(true)
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+                      >
+                        <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span>Search</span>
+                      </button>
+
+                      {/* 2. Select messages with icon */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatHeaderMenuOpen(false)
+                          setIsSelectionMode(true)
+                          setSelectedMessageIds([])
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+                      >
+                        <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Select messages</span>
+                      </button>
+
+                      {/* 3. Close chat with icon */}
+                      <button
+                        type="button"
+                        onClick={handleCloseChat}
+                        className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+                      >
+                        <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <span>Close chat</span>
+                      </button>
+
+                      {/* 4. Clear chat with icon */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatHeaderMenuOpen(false)
+                          promptClearChat(selectedChat)
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+                      >
+                        <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Clear chat</span>
+                      </button>
+
+                      <div className="my-1 border-t border-slate-100 dark:border-slate-700/70" />
+
+                      {/* 5. Delete chat with icon */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatHeaderMenuOpen(false)
+                          promptDeleteChats([selectedChat.jid], selectedChat.name)
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-left"
+                      >
+                        <svg className="w-4 h-4 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Delete chat</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          <div ref={messagesContainerRef} className="flex-1 bg-slate-50 dark:bg-slate-900/45 p-4 overflow-y-auto">
-            {!selectedChat ? (
-              <EmptyState title="Select a chat" description="Messages will appear here" />
-            ) : loadingMessages ? (
-              <div className="space-y-3 animate-pulse">
-                {[1, 2, 3, 4].map(item => (
-                  <div key={item} className={`flex ${item % 2 === 0 ? 'justify-end' : 'justify-start'}`}>
-                    <div className="w-72 max-w-[80%] rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 space-y-2">
-                      <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" />
-                      <div className="h-3 bg-slate-100 dark:bg-slate-700/70 rounded w-full" />
-                      <div className="h-3 bg-slate-100 dark:bg-slate-700/70 rounded w-2/3" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : messageError ? (
-              <div className="rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 p-4 text-sm text-rose-700 dark:text-rose-300">
-                {messageError}
-              </div>
-            ) : messages.length === 0 ? (
-              <EmptyState title="No messages yet" description="This chat returned an empty message list" />
-            ) : (
-              <div className="space-y-3">
-                {messages.map(message => (
-                  <div key={message.id} className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'} group`}>
-                    <div className={`relative max-w-[86%] rounded-2xl border p-3 shadow-sm transition-all ${message.fromMe
-                        ? 'bg-emerald-600 border-emerald-600 text-white'
-                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
-                      }`}>
-                      <div className="flex items-center justify-between gap-4 mb-1.5">
-                        <p className={`text-[10px] font-bold truncate ${message.fromMe ? 'text-emerald-50' : 'text-slate-500 dark:text-slate-400'}`}>
-                          {message.fromMe ? 'You' : message.senderName}
-                        </p>
-                        <div className="flex items-center gap-1.5">
-                          <p className={`text-[10px] shrink-0 ${message.fromMe ? 'text-emerald-100' : 'text-slate-400 dark:text-slate-500'}`}>
-                            {formatDateTime(message.createdAt)}
-                          </p>
-                          <button
-                            type="button"
-                            title="Delete message"
-                            onClick={() => promptDeleteMessage(message)}
-                            className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity cursor-pointer ${
-                              message.fromMe ? 'text-emerald-200 hover:text-white' : 'text-slate-400 hover:text-rose-500'
-                            }`}
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+          {/* Messages & Search Drawer Container */}
+          <div className="flex flex-1 min-h-0 overflow-hidden relative">
+            {/* Conversation Messages Area */}
+            <div className="flex-1 flex flex-col min-w-0 h-full relative">
+              <div ref={messagesContainerRef} className="flex-1 bg-slate-50 dark:bg-slate-900/45 p-4 overflow-y-auto">
+                {!selectedChat ? (
+                  <EmptyState title="Select a chat" description="Messages will appear here" />
+                ) : loadingMessages ? (
+                  <div className="space-y-3 animate-pulse">
+                    {[1, 2, 3, 4].map(item => (
+                      <div key={item} className={`flex ${item % 2 === 0 ? 'justify-end' : 'justify-start'}`}>
+                        <div className="w-72 max-w-[80%] rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 space-y-2">
+                          <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" />
+                          <div className="h-3 bg-slate-100 dark:bg-slate-700/70 rounded w-full" />
+                          <div className="h-3 bg-slate-100 dark:bg-slate-700/70 rounded w-2/3" />
                         </div>
                       </div>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                        {message.body || `[${message.type}]`}
-                      </p>
-                      {!message.fromMe && message.from && (
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-2 truncate">{message.from}</p>
-                      )}
-                    </div>
+                    ))}
                   </div>
-                ))}
-                <div ref={messagesEndRef} />
+                ) : messageError ? (
+                  <div className="rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 p-4 text-sm text-rose-700 dark:text-rose-300">
+                    {messageError}
+                  </div>
+                ) : messages.length === 0 ? (
+                  <EmptyState title="No messages yet" description="This chat returned an empty message list" />
+                ) : (
+                  <div className="space-y-3">
+                    {messages.map(message => {
+                      const isMsgSelected = selectedMsgIdSet.has(message.id)
+                      const isHighlighted = highlightedMsgId === message.id
+
+                      return (
+                        <div
+                          key={message.id}
+                          id={`msg-${message.id}`}
+                          onClick={() => {
+                            if (isSelectionMode) {
+                              toggleSelectMessage(message.id)
+                            }
+                          }}
+                          className={`flex items-start gap-3 transition-all rounded-2xl p-1.5 ${
+                            message.fromMe ? 'justify-end' : 'justify-start'
+                          } ${
+                            isSelectionMode ? 'cursor-pointer hover:bg-slate-200/50 dark:hover:bg-slate-800/60' : ''
+                          } ${
+                            isMsgSelected ? 'bg-emerald-50/70 dark:bg-emerald-950/30 ring-2 ring-emerald-500/50' : ''
+                          } ${
+                            isHighlighted ? 'whatsapp-highlight' : ''
+                          } group`}
+                        >
+                          {/* 🔘 Selection Checkbox in Select Mode (WhatsApp Web style) */}
+                          {isSelectionMode && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleSelectMessage(message.id)
+                              }}
+                              className={`mt-2 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                                isMsgSelected
+                                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                                  : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 hover:border-emerald-500'
+                              }`}
+                              aria-label={`Select message ${message.id}`}
+                            >
+                              {isMsgSelected && (
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                          )}
+
+                          <div className={`relative max-w-[86%] rounded-2xl border p-3 shadow-sm transition-all ${
+                            message.fromMe
+                              ? 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
+                          } ${isHighlighted ? 'ring-2 ring-emerald-400 dark:ring-emerald-400' : ''}`}>
+                            <div className="flex items-center justify-between gap-4 mb-1.5">
+                              <p className={`text-[10px] font-bold truncate ${message.fromMe ? 'text-emerald-50' : 'text-slate-500 dark:text-slate-400'}`}>
+                                {message.fromMe ? 'You' : message.senderName}
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <p className={`text-[10px] shrink-0 ${message.fromMe ? 'text-emerald-100' : 'text-slate-400 dark:text-slate-500'}`}>
+                                  {formatDateTime(message.createdAt)}
+                                </p>
+                                {!isSelectionMode && (
+                                  <button
+                                    type="button"
+                                    title="Delete message"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      promptDeleteMessage(message)
+                                    }}
+                                    className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity cursor-pointer ${
+                                      message.fromMe ? 'text-emerald-200 hover:text-white' : 'text-slate-400 hover:text-rose-500'
+                                    }`}
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                              {message.body || `[${message.type}]`}
+                            </p>
+                            {!message.fromMe && message.from && (
+                              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-2 truncate">{message.from}</p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
+              </div>
+
+              {/* 📱 WHATSAPP WEB SELECTION ACTION BAR (Bottom Bar) */}
+              {isSelectionMode && selectedChat && (
+                <div className="p-3 bg-white dark:bg-[#202c33] border-t border-slate-200 dark:border-slate-700/80 shadow-lg flex items-center justify-between gap-3 animate-fadeIn z-20">
+                  {/* Left: Cancel X + Selection Count */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      title="Cancel selection"
+                      onClick={handleCancelSelectionMode}
+                      className="p-2 rounded-full text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors cursor-pointer"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {selectedMessageIds.length} selected
+                    </span>
+                  </div>
+
+                  {/* Right: Actions (Select all / Delete selected) */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllMessages}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    >
+                      {selectedMessageIds.length === messages.length ? 'Deselect All' : 'Select All'}
+                    </button>
+
+                    <button
+                      type="button"
+                      title="Delete selected messages"
+                      onClick={promptDeleteSelectedMessages}
+                      disabled={selectedMessageIds.length === 0}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm hover:shadow-rose-600/20"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      <span>Delete ({selectedMessageIds.length})</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 🔍 WHATSAPP WEB SEARCH MESSAGES SIDE DRAWER */}
+            {isSearchOpen && selectedChat && (
+              <div className="w-full sm:w-80 md:w-96 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111b21] flex flex-col h-full shrink-0 animate-fadeIn z-30 shadow-xl">
+                {/* Search Drawer Header */}
+                <div className="p-4 border-b border-slate-100 dark:border-slate-700/80 flex items-center justify-between gap-3 bg-white dark:bg-[#111b21]">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      title="Close search"
+                      onClick={() => {
+                        setIsSearchOpen(false)
+                        setMessageSearchQuery('')
+                      }}
+                      className="p-1.5 rounded-full text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">Search messages</h3>
+                  </div>
+                </div>
+
+                {/* Search Input Bar */}
+                <div className="p-3 border-b border-slate-100 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-900/50">
+                  <div className="relative w-full">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </span>
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={messageSearchQuery}
+                      onChange={(e) => setMessageSearchQuery(e.target.value)}
+                      placeholder="Search in chat..."
+                      className="w-full pl-9 pr-8 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                    />
+                    {messageSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMessageSearchQuery('')
+                          searchInputRef.current?.focus()
+                        }}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Search Results List */}
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                  {!messageSearchQuery.trim() ? (
+                    <div className="text-center py-16 px-4">
+                      <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800/80 mx-auto mb-3 flex items-center justify-center text-slate-400 dark:text-slate-500">
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Search messages</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Search for messages within this chat</p>
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="text-center py-16 px-4 animate-fadeIn">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 mx-auto mb-3 flex items-center justify-center text-rose-500">
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No message found</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate max-w-[200px] mx-auto">
+                        No messages match &ldquo;{messageSearchQuery}&rdquo;
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="px-4 py-2 bg-slate-50/80 dark:bg-slate-900/30 text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                        {searchResults.length} message{searchResults.length > 1 ? 's' : ''} found
+                      </div>
+                      {searchResults.map((msg) => (
+                        <div
+                          key={msg.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleJumpToMessage(msg.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              handleJumpToMessage(msg.id)
+                            }
+                          }}
+                          className="p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/70 transition-colors cursor-pointer text-left group"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                              {msg.fromMe ? 'You' : msg.senderName}
+                            </span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                              {formatTimeOnly(msg.createdAt) || formatDateTime(msg.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">
+                            <HighlightMatchedText text={msg.body} query={messageSearchQuery} />
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
