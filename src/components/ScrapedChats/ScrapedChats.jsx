@@ -259,6 +259,7 @@ const ScrapedChats = ({ setToast }) => {
   const messagesContainerRef = useRef(null)
   const dropdownRef = useRef(null)
   const chatHeaderMenuRef = useRef(null)
+  const chatContextMenuRef = useRef(null)
   const chatListContainerRef = useRef(null)
   const searchInputRef = useRef(null)
   const highlightTimeoutRef = useRef(null)
@@ -279,6 +280,12 @@ const ScrapedChats = ({ setToast }) => {
   
   // 📱 WhatsApp Web Feature States
   const [chatHeaderMenuOpen, setChatHeaderMenuOpen] = useState(false)
+  const [chatContextMenu, setChatContextMenu] = useState({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    targetMessage: null,
+  })
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedMessageIds, setSelectedMessageIds] = useState([])
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -320,12 +327,16 @@ const ScrapedChats = ({ setToast }) => {
       if (chatHeaderMenuRef.current && !chatHeaderMenuRef.current.contains(e.target)) {
         setChatHeaderMenuOpen(false)
       }
+      if (chatContextMenuRef.current && !chatContextMenuRef.current.contains(e.target)) {
+        setChatContextMenu(prev => ({ ...prev, isOpen: false }))
+      }
     }
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setOpenDropdownJid(null)
         setChatHeaderMenuOpen(false)
+        setChatContextMenu(prev => ({ ...prev, isOpen: false }))
         if (isSelectionMode) {
           setIsSelectionMode(false)
           setSelectedMessageIds([])
@@ -366,6 +377,7 @@ const ScrapedChats = ({ setToast }) => {
     setIsSearchOpen(false)
     setMessageSearchQuery('')
     setChatHeaderMenuOpen(false)
+    setChatContextMenu({ isOpen: false, x: 0, y: 0, targetMessage: null })
   }
 
   const selectedChat = useMemo(
@@ -569,6 +581,27 @@ const ScrapedChats = ({ setToast }) => {
     }
   }
 
+  // 📱 WhatsApp Web Right-Click Context Menu on Chat Messages Area
+  const handleChatAreaContextMenu = (e, message = null) => {
+    if (!selectedChat) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const menuWidth = 220
+    const menuHeight = message?.id ? 280 : 230
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12)
+
+    setChatHeaderMenuOpen(false)
+    setOpenDropdownJid(null)
+    setChatContextMenu({
+      isOpen: true,
+      x: Math.max(12, x),
+      y: Math.max(12, y),
+      targetMessage: message,
+    })
+  }
+
   // ✅ Toggle Single Message Selection
   const toggleSelectMessage = (messageId) => {
     setSelectedMessageIds(prev =>
@@ -596,6 +629,7 @@ const ScrapedChats = ({ setToast }) => {
   // ✕ Close Active Chat (WhatsApp Style)
   const handleCloseChat = () => {
     setChatHeaderMenuOpen(false)
+    setChatContextMenu({ isOpen: false, x: 0, y: 0, targetMessage: null })
     setSelectedChatId('')
     setIsSearchOpen(false)
     setMessageSearchQuery('')
