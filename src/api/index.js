@@ -135,13 +135,10 @@ export const scrapedChatsApi = {
 };
 
 export const propertyApi = {
-  filterProperties: (filters) => {
-    const userId = getLoggedInUserId()
-    return apiRequest(API_ENDPOINTS.filterProperties, {
-      method: 'POST',
-      body: JSON.stringify({ filters, ...(userId ? { userId } : {}) }),
-    })
-  },
+  filterProperties: (filters) => apiRequest(API_ENDPOINTS.filterProperties, {
+    method: 'POST',
+    body: JSON.stringify({ filters }),
+  }),
 };
 
 // ML WhatsApp AI Search Backend
@@ -149,13 +146,7 @@ const ML_BASE_URL = import.meta.env.VITE_ML_API_URL || '/ml-api';
 
 export const mlSearchApi = {
   dashboardSearch: (filters = {}) => {
-    const userId = getLoggedInUserId()
     const payload = {}
-
-    if (userId) {
-      payload.userId = userId
-      payload.user_id = userId
-    }
 
     if (filters.purpose && filters.purpose !== 'All') payload.purpose = filters.purpose
     if (filters.city && filters.city !== 'All Cities') payload.city = filters.city
@@ -185,11 +176,11 @@ export const mlSearchApi = {
 
     return fetch(`${ML_BASE_URL}/api/dashboard-search`, {
       method: 'POST',
-      headers: buildHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }).then(async (res) => {
       const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.detail || data?.message || `ML API error: ${res.status}`)
+      if (!res.ok) throw new Error(data?.detail || `ML API error: ${res.status}`)
       return data
     })
   },
