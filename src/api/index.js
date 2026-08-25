@@ -146,10 +146,35 @@ export const propertyApi = {
 };
 
 // ML WhatsApp AI Search Backend
-const rawMlUrl = (import.meta.env.VITE_ML_API_URL || 'http://13.48.129.228:8000/api/dashboard-search').trim()
-const ML_SEARCH_URL = rawMlUrl.endsWith('/api/dashboard-search')
-  ? rawMlUrl
-  : `${rawMlUrl.replace(/\/$/, '')}/api/dashboard-search`
+const ML_API_PROXY_PREFIX = '/ml-api'
+const ML_SEARCH_PATH = '/api/dashboard-search'
+const CORS_PROXIED_ML_HOSTS = new Set(['16.16.126.44:8000', '13.48.129.228:8000'])
+
+const addMlSearchPath = (url) => {
+  const cleanUrl = url.replace(/\/$/, '')
+  return cleanUrl.endsWith(ML_SEARCH_PATH) ? cleanUrl : `${cleanUrl}${ML_SEARCH_PATH}`
+}
+
+const toCorsSafeMlUrl = (url) => {
+  const configuredUrl = (url || '').trim() || ML_API_PROXY_PREFIX
+  const fullUrl = addMlSearchPath(configuredUrl)
+
+  if (fullUrl.startsWith('/')) return fullUrl
+
+  try {
+    const parsed = new URL(fullUrl)
+    if (CORS_PROXIED_ML_HOSTS.has(parsed.host)) {
+      return `${ML_API_PROXY_PREFIX}${parsed.pathname}${parsed.search}`
+    }
+  } catch (err) {
+    console.warn('Invalid VITE_ML_API_URL, falling back to local ML proxy:', err)
+    return addMlSearchPath(ML_API_PROXY_PREFIX)
+  }
+
+  return fullUrl
+}
+
+const ML_SEARCH_URL = toCorsSafeMlUrl(import.meta.env.VITE_ML_API_URL)
 
 export const mlSearchApi = {
   dashboardSearch: (filters = {}) => {
