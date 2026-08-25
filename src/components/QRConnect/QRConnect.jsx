@@ -93,14 +93,25 @@ const QRConnect = () => {
           'Cache-Control': 'no-cache, no-store, must-revalidate'
         }
       })
-      if (!res.ok) throw new Error(`Server error: ${res.status}`)
-      const json = await res.json()
+
+      const json = await res.json().catch(() => null)
+
+      // Handle 404 or waiting state gracefully (Baileys worker generating fresh QR)
+      if (res.status === 404 || json?.message === 'No fresh QR URL found' || json?.data?.status === 'waiting') {
+        setStatus(prev => (prev === STATUS.CONNECTED ? prev : STATUS.LOADING))
+        return
+      }
+
+      if (!res.ok) throw new Error(json?.message || `Server error: ${res.status}`)
 
       // Handle array or object structure
       const rawData = Array.isArray(json?.data) ? json.data[0] : (json?.data || json)
       const qrCode = rawData?.url || rawData?.qr || json?.url || json?.qr || '';
 
-      if (!qrCode) throw new Error('QR code URL/data not found in backend response')
+      if (!qrCode) {
+        setStatus(prev => (prev === STATUS.CONNECTED ? prev : STATUS.LOADING))
+        return
+      }
 
       const createdAt = rawData?.created_at || rawData?.createdAt || json?.created_at || new Date().toISOString()
 
@@ -116,12 +127,15 @@ const QRConnect = () => {
       isInitialFetch.current = false
     } catch (err) {
       console.error('QR fetch error:', err.message)
-      if (isInitialFetch.current) {
-        setStatus(STATUS.ERROR)
-        setErrorMsg(err.message || 'Failed to fetch QR code from backend')
+      // Only show error if not a 404 / waiting status and no active QR
+      if (isInitialFetch.current && !qrData) {
+        if (!err.message?.includes('404') && !err.message?.includes('fresh QR')) {
+          setStatus(STATUS.ERROR)
+          setErrorMsg(err.message || 'Failed to fetch QR code from backend')
+        }
       }
     }
-  }, [checkConnectionStatus])
+  }, [checkConnectionStatus, qrData])
 
   // ⚡ Socket.IO live sync for real-time QR updates & connection events
   useEffect(() => {
@@ -234,8 +248,8 @@ const QRConnect = () => {
         {status === STATUS.LOADING && (
           <div className="text-center py-8">
             <div className="w-14 h-14 rounded-full border-4 border-emerald-200 border-t-emerald-500 animate-spin mx-auto mb-4" />
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Checking WhatsApp connection...</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Connecting to scrapper node server</p>
+            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Generating WhatsApp QR Code...</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Connecting to WhatsApp server and preparing fresh QR code</p>
           </div>
         )}
 
