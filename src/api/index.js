@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   scrapedChatsMonitored: `${BASE_URL}/api/scraped-chats/monitored`,
   scrapedChatsDelete: `${BASE_URL}/api/scraped-chats/delete`,
   filterProperties: `${BASE_URL}/api/properties/filter`,
+  normalizeStatus: `${BASE_URL}/api/normalize/status`,
 };
 
 const buildHeaders = () => {
@@ -145,7 +146,10 @@ export const propertyApi = {
 };
 
 // ML WhatsApp AI Search Backend
-const ML_BASE_URL = import.meta.env.VITE_ML_API_URL || '/ml-api';
+const rawMlUrl = (import.meta.env.VITE_ML_API_URL || 'http://13.48.129.228:8000/api/dashboard-search').trim()
+const ML_SEARCH_URL = rawMlUrl.endsWith('/api/dashboard-search')
+  ? rawMlUrl
+  : `${rawMlUrl.replace(/\/$/, '')}/api/dashboard-search`
 
 export const mlSearchApi = {
   dashboardSearch: (filters = {}) => {
@@ -183,7 +187,7 @@ export const mlSearchApi = {
 
     payload.limit = filters.limit || 10000
 
-    return fetch(`${ML_BASE_URL}/api/dashboard-search`, {
+    return fetch(ML_SEARCH_URL, {
       method: 'POST',
       headers: buildHeaders(),
       body: JSON.stringify(payload),
@@ -194,3 +198,35 @@ export const mlSearchApi = {
     })
   },
 };
+
+// 🧠 AI Message Normalization API (Status Only)
+export const normalizeApi = {
+  getStatus: async () => {
+    const userId = getLoggedInUserId()
+    const queryParams = new URLSearchParams()
+    if (userId) {
+      queryParams.append('userId', userId)
+      queryParams.append('user_id', userId)
+    }
+
+    const url = queryParams.toString()
+      ? `${API_ENDPOINTS.normalizeStatus}?${queryParams.toString()}`
+      : API_ENDPOINTS.normalizeStatus
+
+    console.log('🔍 [Normalize API] Checking normalization status...', { url, userId })
+
+    try {
+      const response = await apiRequest(url)
+      console.log('📊 [Normalize API] Normalization Status Response:', response)
+      return response
+    } catch (err) {
+      console.error('❌ [Normalize API] Normalization Status Failed:', err)
+      throw err
+    }
+  },
+};
+
+// Expose on window for easy testing in browser console
+if (typeof window !== 'undefined') {
+  window.normalizeApi = normalizeApi
+}
