@@ -270,6 +270,9 @@ const ScrapedChats = ({ setToast }) => {
   const chatListContainerRef = useRef(null)
   const searchInputRef = useRef(null)
   const highlightTimeoutRef = useRef(null)
+  // Right-click context menu refs
+  const chatListCtxMenuRef = useRef(null)
+  const msgCtxMenuRef = useRef(null)
 
   const [chats, setChats] = useState([])
   const [messages, setMessages] = useState([])
@@ -298,6 +301,15 @@ const ScrapedChats = ({ setToast }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [messageSearchQuery, setMessageSearchQuery] = useState('')
   const [highlightedMsgId, setHighlightedMsgId] = useState(null)
+
+  // 🖱️ Right-Click Context Menu: Chat List Item
+  const [chatListContextMenu, setChatListContextMenu] = useState({
+    isOpen: false, x: 0, y: 0, chat: null,
+  })
+  // 🖱️ Right-Click Context Menu: Message Bubble
+  const [msgContextMenu, setMsgContextMenu] = useState({
+    isOpen: false, x: 0, y: 0, message: null,
+  })
 
   const [pinnedJids, setPinnedJids] = useState(() => {
     try {
@@ -337,6 +349,12 @@ const ScrapedChats = ({ setToast }) => {
       if (chatContextMenuRef.current && !chatContextMenuRef.current.contains(e.target)) {
         setChatContextMenu(prev => ({ ...prev, isOpen: false }))
       }
+      if (chatListCtxMenuRef.current && !chatListCtxMenuRef.current.contains(e.target)) {
+        setChatListContextMenu(prev => ({ ...prev, isOpen: false }))
+      }
+      if (msgCtxMenuRef.current && !msgCtxMenuRef.current.contains(e.target)) {
+        setMsgContextMenu(prev => ({ ...prev, isOpen: false }))
+      }
     }
 
     const handleKeyDown = (e) => {
@@ -344,6 +362,8 @@ const ScrapedChats = ({ setToast }) => {
         setOpenDropdownJid(null)
         setChatHeaderMenuOpen(false)
         setChatContextMenu(prev => ({ ...prev, isOpen: false }))
+        setChatListContextMenu(prev => ({ ...prev, isOpen: false }))
+        setMsgContextMenu(prev => ({ ...prev, isOpen: false }))
         if (isSelectionMode) {
           setIsSelectionMode(false)
           setSelectedMessageIds([])
@@ -622,6 +642,34 @@ const ScrapedChats = ({ setToast }) => {
       y: Math.max(12, y),
       targetMessage: message,
     })
+  }
+
+  // 🖱️ Right-Click on Chat List Item → show context menu
+  const handleChatListContextMenu = (e, chat) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const menuWidth = 220
+    const menuHeight = 180
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12)
+    setOpenDropdownJid(null)
+    setChatHeaderMenuOpen(false)
+    setMsgContextMenu(prev => ({ ...prev, isOpen: false }))
+    setChatListContextMenu({ isOpen: true, x: Math.max(8, x), y: Math.max(8, y), chat })
+  }
+
+  // 🖱️ Right-Click on Message Bubble → show context menu
+  const handleMsgContextMenu = (e, message) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const menuWidth = 200
+    const menuHeight = 145
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12)
+    setChatHeaderMenuOpen(false)
+    setOpenDropdownJid(null)
+    setChatListContextMenu(prev => ({ ...prev, isOpen: false }))
+    setMsgContextMenu({ isOpen: true, x: Math.max(8, x), y: Math.max(8, y), message })
   }
 
   // ✅ Toggle Single Message Selection
@@ -1146,6 +1194,7 @@ const ScrapedChats = ({ setToast }) => {
                       role="button"
                       tabIndex={0}
                       onClick={() => handleSelectChat(chat.jid)}
+                      onContextMenu={(e) => handleChatListContextMenu(e, chat)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault()
@@ -1422,7 +1471,35 @@ const ScrapedChats = ({ setToast }) => {
                         <span>Select messages</span>
                       </button>
 
-                      {/* 3. Close chat with icon */}
+                      <div className="my-1 border-t border-slate-100 dark:border-slate-700/70" />
+
+                      {/* 3. Pin / Unpin chat */}
+                      <button
+                        type="button"
+                        onClick={() => { setChatHeaderMenuOpen(false); togglePinChat(selectedChat) }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+                      >
+                        <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 fill-current text-slate-400 dark:text-slate-300" fill="currentColor">
+                          <path d="M16 3H8C7.45 3 7 3.45 7 4V5.5C7 6.05 7.45 6.5 8 6.5H9V11.5L7.29 13.21C7.11 13.39 7 13.65 7 13.91V15.5C7 16.05 7.45 16.5 8 16.5H11V21C11 21.55 11.45 22 12 22C12.55 22 13 21.55 13 21V16.5H16C16.55 16.5 17 16.05 17 15.5V13.91C17 13.65 16.89 13.39 16.71 13.21L15 11.5V6.5H16C16.55 6.5 17 6.05 17 5.5V4C17 3.45 16.55 3 16 3Z" />
+                        </svg>
+                        <span>{pinnedJids.includes(selectedChat?.jid) ? 'Unpin chat' : 'Pin chat'}</span>
+                      </button>
+
+                      {/* 4. Monitor / Unmonitor */}
+                      <button
+                        type="button"
+                        onClick={() => { setChatHeaderMenuOpen(false); handleToggleMonitorSingle(selectedChat) }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+                      >
+                        <svg className={`w-4 h-4 shrink-0 ${selectedChat?.isMonitored ? 'text-amber-500' : 'text-emerald-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{selectedChat?.isMonitored ? 'Unmonitor chat' : 'Monitor chat'}</span>
+                      </button>
+
+                      <div className="my-1 border-t border-slate-100 dark:border-slate-700/70" />
+
+                      {/* 5. Close chat with icon */}
                       <button
                         type="button"
                         onClick={handleCloseChat}
@@ -1434,7 +1511,7 @@ const ScrapedChats = ({ setToast }) => {
                         <span>Close chat</span>
                       </button>
 
-                      {/* 4. Clear chat with icon */}
+                      {/* 6. Clear chat with icon */}
                       <button
                         type="button"
                         onClick={() => {
@@ -1451,7 +1528,7 @@ const ScrapedChats = ({ setToast }) => {
 
                       <div className="my-1 border-t border-slate-100 dark:border-slate-700/70" />
 
-                      {/* 5. Delete chat with icon */}
+                      {/* 7. Delete chat with icon */}
                       <button
                         type="button"
                         onClick={() => {
@@ -1476,7 +1553,11 @@ const ScrapedChats = ({ setToast }) => {
           <div className="flex flex-1 min-h-0 overflow-hidden relative">
             {/* Conversation Messages Area */}
             <div className="flex-1 flex flex-col min-w-0 h-full relative">
-              <div ref={messagesContainerRef} className="flex-1 bg-slate-50 dark:bg-slate-900/45 p-4 overflow-y-auto">
+              <div
+                ref={messagesContainerRef}
+                onContextMenu={(e) => handleChatAreaContextMenu(e, null)}
+                className="flex-1 bg-slate-50 dark:bg-slate-900/45 p-4 overflow-y-auto"
+              >
                 {!selectedChat ? (
                   <EmptyState title="Select a chat" description="Messages will appear here" />
                 ) : loadingMessages ? (
@@ -1545,7 +1626,9 @@ const ScrapedChats = ({ setToast }) => {
                             </button>
                           )}
 
-                          <div className={`relative max-w-[86%] rounded-2xl border p-3 shadow-sm transition-all ${
+                          <div
+                            onContextMenu={(e) => handleMsgContextMenu(e, message)}
+                            className={`relative max-w-[86%] rounded-2xl border p-3 shadow-sm transition-all ${
                             message.fromMe
                               ? 'bg-emerald-600 border-emerald-600 text-white'
                               : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
@@ -1769,6 +1852,229 @@ const ScrapedChats = ({ setToast }) => {
         onConfirm={confirmModal.onConfirm}
         onCancel={closeConfirmModal}
       />
+
+      {/* 🖱️ RIGHT-CLICK CONTEXT MENU: Chat Room Background (same as 3-dot header menu) */}
+      {chatContextMenu.isOpen && selectedChat && (
+        <div
+          ref={chatContextMenuRef}
+          style={{ position: 'fixed', top: chatContextMenu.y, left: chatContextMenu.x, zIndex: 9999 }}
+          className="min-w-[230px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-scaleUp origin-top-left backdrop-blur-md"
+        >
+          {/* 1. Search */}
+          <button
+            type="button"
+            onClick={() => { setChatContextMenu(p => ({ ...p, isOpen: false })); setIsSearchOpen(true) }}
+            className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+          >
+            <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span>Search</span>
+          </button>
+
+          {/* 2. Select messages */}
+          <button
+            type="button"
+            onClick={() => { setChatContextMenu(p => ({ ...p, isOpen: false })); setIsSelectionMode(true); setSelectedMessageIds([]) }}
+            className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+          >
+            <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Select messages</span>
+          </button>
+
+          <div className="my-1 border-t border-slate-100 dark:border-slate-700/70" />
+
+          {/* 3. Pin / Unpin */}
+          <button
+            type="button"
+            onClick={() => { setChatContextMenu(p => ({ ...p, isOpen: false })); togglePinChat(selectedChat) }}
+            className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 fill-current text-slate-400 dark:text-slate-300" fill="currentColor">
+              <path d="M16 3H8C7.45 3 7 3.45 7 4V5.5C7 6.05 7.45 6.5 8 6.5H9V11.5L7.29 13.21C7.11 13.39 7 13.65 7 13.91V15.5C7 16.05 7.45 16.5 8 16.5H11V21C11 21.55 11.45 22 12 22C12.55 22 13 21.55 13 21V16.5H16C16.55 16.5 17 16.05 17 15.5V13.91C17 13.65 16.89 13.39 16.71 13.21L15 11.5V6.5H16C16.55 6.5 17 6.05 17 5.5V4C17 3.45 16.55 3 16 3Z" />
+            </svg>
+            <span>{pinnedJids.includes(selectedChat.jid) ? 'Unpin chat' : 'Pin chat'}</span>
+          </button>
+
+          {/* 4. Monitor / Unmonitor */}
+          <button
+            type="button"
+            onClick={() => { setChatContextMenu(p => ({ ...p, isOpen: false })); handleToggleMonitorSingle(selectedChat) }}
+            className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+          >
+            <svg className={`w-4 h-4 shrink-0 ${selectedChat.isMonitored ? 'text-amber-500' : 'text-emerald-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{selectedChat.isMonitored ? 'Unmonitor chat' : 'Monitor chat'}</span>
+          </button>
+
+          <div className="my-1 border-t border-slate-100 dark:border-slate-700/70" />
+
+          {/* 5. Close chat */}
+          <button
+            type="button"
+            onClick={() => { setChatContextMenu(p => ({ ...p, isOpen: false })); handleCloseChat() }}
+            className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+          >
+            <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span>Close chat</span>
+          </button>
+
+          {/* 6. Clear chat */}
+          <button
+            type="button"
+            onClick={() => { setChatContextMenu(p => ({ ...p, isOpen: false })); promptClearChat(selectedChat) }}
+            className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+          >
+            <svg className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Clear chat</span>
+          </button>
+
+          <div className="my-1 border-t border-slate-100 dark:border-slate-700/70" />
+
+          {/* 7. Delete chat */}
+          <button
+            type="button"
+            onClick={() => { setChatContextMenu(p => ({ ...p, isOpen: false })); promptDeleteChats([selectedChat.jid], selectedChat.name) }}
+            className="w-full px-4 py-2.5 flex items-center gap-3.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-left"
+          >
+            <svg className="w-4 h-4 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Delete chat</span>
+          </button>
+        </div>
+      )}
+
+      {/* 🖱️ RIGHT-CLICK CONTEXT MENU: Chat List Item (WhatsApp Web Style) */}
+
+      {chatListContextMenu.isOpen && chatListContextMenu.chat && (() => {
+        const c = chatListContextMenu.chat
+        const isPinnedCtx = pinnedJids.includes(c.jid)
+        return (
+          <div
+            ref={chatListCtxMenuRef}
+            style={{ position: 'fixed', top: chatListContextMenu.y, left: chatListContextMenu.x, zIndex: 9999 }}
+            className="min-w-[210px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-scaleUp origin-top-left backdrop-blur-md"
+          >
+            {/* Pin / Unpin */}
+            <button
+              type="button"
+              onClick={() => { setChatListContextMenu(p => ({ ...p, isOpen: false })); togglePinChat(c) }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 fill-current text-slate-400" fill="currentColor">
+                <path d="M16 3H8C7.45 3 7 3.45 7 4V5.5C7 6.05 7.45 6.5 8 6.5H9V11.5L7.29 13.21C7.11 13.39 7 13.65 7 13.91V15.5C7 16.05 7.45 16.5 8 16.5H11V21C11 21.55 11.45 22 12 22C12.55 22 13 21.55 13 21V16.5H16C16.55 16.5 17 16.05 17 15.5V13.91C17 13.65 16.89 13.39 16.71 13.21L15 11.5V6.5H16C16.55 6.5 17 6.05 17 5.5V4C17 3.45 16.55 3 16 3Z" />
+              </svg>
+              <span>{isPinnedCtx ? 'Unpin chat' : 'Pin chat'}</span>
+            </button>
+
+            {/* Monitor / Unmonitor */}
+            <button
+              type="button"
+              onClick={() => { setChatListContextMenu(p => ({ ...p, isOpen: false })); handleToggleMonitorSingle(c) }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+            >
+              <svg className={`w-4 h-4 shrink-0 ${c.isMonitored ? 'text-amber-500' : 'text-emerald-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{c.isMonitored ? 'Unmonitor' : 'Monitor'}</span>
+            </button>
+
+            {/* Clear chat */}
+            <button
+              type="button"
+              onClick={() => { setChatListContextMenu(p => ({ ...p, isOpen: false })); handleClearChatFromDropdown(c) }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+            >
+              <svg className="w-4 h-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Clear chat</span>
+            </button>
+
+            <div className="my-1 border-t border-slate-100 dark:border-slate-700/60" />
+
+            {/* Delete chat */}
+            <button
+              type="button"
+              onClick={() => { setChatListContextMenu(p => ({ ...p, isOpen: false })); handleDeleteChatFromDropdown(c) }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-left"
+            >
+              <svg className="w-4 h-4 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Delete chat</span>
+            </button>
+          </div>
+        )
+      })()}
+
+      {/* 🖱️ RIGHT-CLICK CONTEXT MENU: Message Bubble (WhatsApp Web Style) */}
+      {msgContextMenu.isOpen && msgContextMenu.message && (
+        <div
+          ref={msgCtxMenuRef}
+          style={{ position: 'fixed', top: msgContextMenu.y, left: msgContextMenu.x, zIndex: 9999 }}
+          className="min-w-[190px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-scaleUp origin-top-left backdrop-blur-md"
+        >
+          {/* Copy text */}
+          <button
+            type="button"
+            onClick={() => {
+              if (msgContextMenu.message?.body) {
+                navigator.clipboard.writeText(msgContextMenu.message.body).catch(() => {})
+                setToast?.({ type: 'success', message: 'Message copied to clipboard' })
+              }
+              setMsgContextMenu(p => ({ ...p, isOpen: false }))
+            }}
+            className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+          >
+            <svg className="w-4 h-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Copy text</span>
+          </button>
+
+          {/* Select message */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsSelectionMode(true)
+              toggleSelectMessage(msgContextMenu.message.id)
+              setMsgContextMenu(p => ({ ...p, isOpen: false }))
+            }}
+            className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer text-left"
+          >
+            <svg className="w-4 h-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Select message</span>
+          </button>
+
+          <div className="my-1 border-t border-slate-100 dark:border-slate-700/60" />
+
+          {/* Delete message */}
+          <button
+            type="button"
+            onClick={() => {
+              promptDeleteMessage(msgContextMenu.message)
+              setMsgContextMenu(p => ({ ...p, isOpen: false }))
+            }}
+            className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-left"
+          >
+            <svg className="w-4 h-4 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Delete message</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
