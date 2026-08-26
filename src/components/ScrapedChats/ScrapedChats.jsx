@@ -97,6 +97,11 @@ const normalizeMessage = (message = {}, index) => {
     }
   }
 
+  // Priority: WhatsApp `timestamp` (actual message time) → then DB `created_at`
+  // `created_at` is DB insertion time which can be wrong if messages arrive out-of-order
+  const msgTimestamp = normalizeDate(message.timestamp || message.t || message.created_at || message.createdAt)
+  const dbCreatedAt = normalizeDate(message.created_at || message.createdAt)
+
   return {
     id: id || `${from || to || 'message'}-${message.timestamp || index}`,
     body: String(body || ''),
@@ -105,7 +110,9 @@ const normalizeMessage = (message = {}, index) => {
     senderName,
     type: message.type || message.messageType || message._data?.type || 'message',
     fromMe,
-    createdAt: normalizeDate(message.created_at || message.createdAt || message.timestamp || message.t),
+    createdAt: msgTimestamp || dbCreatedAt,  // display timestamp
+    msgTimestamp,                              // raw WhatsApp timestamp for sorting
+    dbCreatedAt,                               // DB insertion time (fallback)
   }
 }
 
@@ -506,9 +513,13 @@ const ScrapedChats = ({ setToast }) => {
       const list = extractList(payload)
         .map(normalizeMessage)
         .sort((a, b) => {
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
-          if (timeA !== timeB) return timeA - timeB
+          // Sort by WhatsApp timestamp first (most accurate actual message time)
+          // Fall back to DB created_at if timestamp is missing
+          const timeA = a.msgTimestamp ? new Date(a.msgTimestamp).getTime()
+            : a.dbCreatedAt ? new Date(a.dbCreatedAt).getTime() : 0
+          const timeB = b.msgTimestamp ? new Date(b.msgTimestamp).getTime()
+            : b.dbCreatedAt ? new Date(b.dbCreatedAt).getTime() : 0
+          if (timeA !== timeB) return timeA - timeB  // ascending: old → new
           return (Number(a.id) || 0) - (Number(b.id) || 0)
         })
       setMessages(list)
@@ -520,6 +531,7 @@ const ScrapedChats = ({ setToast }) => {
     }
   }, [])
 
+
   useEffect(() => {
     loadChats()
   }, [loadChats])
@@ -529,26 +541,36 @@ const ScrapedChats = ({ setToast }) => {
   }, [loadMessages, selectedChatId])
 
   const scrollToBottom = useCallback((behavior = 'auto') => {
+    // Primary: use messagesEndRef scrollIntoView — most reliable after DOM paint
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' })
+      return
+    }
+    // Fallback: manually set scrollTop to max
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior
-      })
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
     }
   }, [])
 
   // 📱 WhatsApp-like Auto Scroll to Bottom on chat open / messages load
   useEffect(() => {
     if (!loadingMessages && messages.length > 0 && !isSearchOpen) {
+      // First paint — scroll immediately after DOM updates
       const frame = requestAnimationFrame(() => {
         scrollToBottom('auto')
       })
+      // Second pass — catches slow renders / image loads
       const timer = setTimeout(() => {
         scrollToBottom('auto')
-      }, 50)
+      }, 120)
+      // Third pass — final safety net for large message lists
+      const timer2 = setTimeout(() => {
+        scrollToBottom('auto')
+      }, 350)
       return () => {
         cancelAnimationFrame(frame)
         clearTimeout(timer)
+        clearTimeout(timer2)
       }
     }
   }, [messages, loadingMessages, selectedChatId, scrollToBottom, isSearchOpen])
