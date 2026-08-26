@@ -96,11 +96,21 @@ const QRConnect = () => {
 
       const json = await res.json().catch(() => null)
 
-      // Handle 404 or waiting state gracefully (Baileys worker generating fresh QR)
-      if (res.status === 404 || json?.message === 'No fresh QR URL found' || json?.data?.status === 'waiting') {
+      // Handle 404 or "No QR found" messages — skip only if there's truly no QR URL
+      const rawDataCheck = Array.isArray(json?.data) ? json.data[0] : (json?.data || json)
+      const hasQrUrl = !!(rawDataCheck?.url || rawDataCheck?.qr || json?.url || json?.qr)
+
+      if (res.status === 404 || json?.message === 'No fresh QR URL found') {
         setStatus(prev => (prev === STATUS.CONNECTED ? prev : STATUS.LOADING))
         return
       }
+
+      // If backend says "waiting" but has NO QR URL yet, keep loading
+      if (json?.data?.status === 'waiting' && !hasQrUrl) {
+        setStatus(prev => (prev === STATUS.CONNECTED ? prev : STATUS.LOADING))
+        return
+      }
+      // If status is "waiting" but QR URL IS present, fall through and display it
 
       if (!res.ok) throw new Error(json?.message || `Server error: ${res.status}`)
 
