@@ -629,48 +629,67 @@ const ScrapedChats = ({ setToast }) => {
     e.preventDefault()
     e.stopPropagation()
 
-    const menuWidth = 220
-    const menuHeight = message?.id ? 280 : 230
-    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
-    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12)
+    const menuWidth = 240
+    const menuHeight = 300  // chat area menu: 7 items
+    const spaceBelow = window.innerHeight - e.clientY
+    const openUpward = spaceBelow < menuHeight + 16
+
+    const x = Math.min(Math.max(8, e.clientX), window.innerWidth - menuWidth - 12)
+    const y = openUpward
+      ? Math.max(8, e.clientY - menuHeight)
+      : Math.min(e.clientY, window.innerHeight - menuHeight - 12)
 
     setChatHeaderMenuOpen(false)
     setOpenDropdownJid(null)
     setChatContextMenu({
       isOpen: true,
-      x: Math.max(12, x),
-      y: Math.max(12, y),
+      x,
+      y,
+      openUpward,
       targetMessage: message,
     })
   }
 
-  // 🖱️ Right-Click on Chat List Item → show context menu
+  // 🖱️ Right-Click on Chat List Item → show context menu (smart up/down)
   const handleChatListContextMenu = (e, chat) => {
     e.preventDefault()
     e.stopPropagation()
     const menuWidth = 220
-    const menuHeight = 180
-    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
-    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12)
+    const menuHeight = 200   // 4 items
+    const spaceBelow = window.innerHeight - e.clientY
+    const openUpward = spaceBelow < menuHeight + 16
+
+    const x = Math.min(Math.max(8, e.clientX), window.innerWidth - menuWidth - 12)
+    const y = openUpward
+      ? Math.max(8, e.clientY - menuHeight)
+      : Math.min(e.clientY, window.innerHeight - menuHeight - 12)
+
     setOpenDropdownJid(null)
     setChatHeaderMenuOpen(false)
     setMsgContextMenu(prev => ({ ...prev, isOpen: false }))
-    setChatListContextMenu({ isOpen: true, x: Math.max(8, x), y: Math.max(8, y), chat })
+    setChatListContextMenu({ isOpen: true, x, y, openUpward, chat })
   }
 
-  // 🖱️ Right-Click on Message Bubble → show context menu
+  // 🖱️ Right-Click on Message Bubble → show context menu (smart up/down)
   const handleMsgContextMenu = (e, message) => {
     e.preventDefault()
     e.stopPropagation()
     const menuWidth = 200
-    const menuHeight = 145
-    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
-    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12)
+    const menuHeight = 150   // 3 items
+    const spaceBelow = window.innerHeight - e.clientY
+    const openUpward = spaceBelow < menuHeight + 16
+
+    const x = Math.min(Math.max(8, e.clientX), window.innerWidth - menuWidth - 12)
+    const y = openUpward
+      ? Math.max(8, e.clientY - menuHeight)
+      : Math.min(e.clientY, window.innerHeight - menuHeight - 12)
+
     setChatHeaderMenuOpen(false)
     setOpenDropdownJid(null)
     setChatListContextMenu(prev => ({ ...prev, isOpen: false }))
-    setMsgContextMenu({ isOpen: true, x: Math.max(8, x), y: Math.max(8, y), message })
+    setMsgContextMenu({ isOpen: true, x, y, openUpward, message })
   }
+
 
   // ✅ Toggle Single Message Selection
   const toggleSelectMessage = (messageId) => {
@@ -1858,7 +1877,9 @@ const ScrapedChats = ({ setToast }) => {
         <div
           ref={chatContextMenuRef}
           style={{ position: 'fixed', top: chatContextMenu.y, left: chatContextMenu.x, zIndex: 9999 }}
-          className="min-w-[230px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-scaleUp origin-top-left backdrop-blur-md"
+          className={`min-w-[230px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-scaleUp backdrop-blur-md ${
+            chatContextMenu.openUpward ? 'origin-bottom-left' : 'origin-top-left'
+          }`}
         >
           {/* 1. Search */}
           <button
@@ -1961,7 +1982,9 @@ const ScrapedChats = ({ setToast }) => {
           <div
             ref={chatListCtxMenuRef}
             style={{ position: 'fixed', top: chatListContextMenu.y, left: chatListContextMenu.x, zIndex: 9999 }}
-            className="min-w-[210px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-scaleUp origin-top-left backdrop-blur-md"
+            className={`min-w-[210px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-scaleUp backdrop-blur-md ${
+              chatListContextMenu.openUpward ? 'origin-bottom-left' : 'origin-top-left'
+            }`}
           >
             {/* Pin / Unpin */}
             <button
@@ -2021,7 +2044,9 @@ const ScrapedChats = ({ setToast }) => {
         <div
           ref={msgCtxMenuRef}
           style={{ position: 'fixed', top: msgContextMenu.y, left: msgContextMenu.x, zIndex: 9999 }}
-          className="min-w-[190px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-scaleUp origin-top-left backdrop-blur-md"
+          className={`min-w-[190px] bg-white dark:bg-[#233138] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl py-1.5 animate-scaleUp backdrop-blur-md ${
+            msgContextMenu.openUpward ? 'origin-bottom-left' : 'origin-top-left'
+          }`}
         >
           {/* Copy text */}
           <button
