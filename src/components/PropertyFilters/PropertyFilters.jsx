@@ -148,6 +148,14 @@ const PropertyFilters = ({ filters, setFilters, resultCount, onSearch }) => {
         </button>
       </div>
 
+      {/* ✨ AI Smart Search Normalization Indicator */}
+      <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 text-[11px] text-blue-800 dark:text-blue-300 font-medium">
+        <span className="text-xs">✨</span>
+        <span>
+          <strong>AI Smart Engine:</strong> Automatically parses Pakistani property prices (Lac & Crore), detects locations, and categorizes listings from WhatsApp messages.
+        </span>
+      </div>
+
       {/* Row 1: Purpose + City (Sort By is hidden but preserved) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
         <div>

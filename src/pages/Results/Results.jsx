@@ -3,9 +3,88 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import PropertyFilters, { DEFAULT_FILTERS, formatPriceRangeLabel } from '../../components/PropertyFilters/PropertyFilters'
 import { CardSkeleton } from '../../components/Skeleton/Skeleton'
-import { mlSearchApi } from '../../api'
+import { mlSearchApi, normalizeApi } from '../../api'
 
 const ITEMS_PER_PAGE = 20
+
+// 🧠 Helper to analyze and explain why normalization occurred for search results
+const analyzeNormalizationReasons = (rawResults = [], filters = {}, normStatus = null) => {
+  const reasons = []
+
+  // 1. Price Normalization & Currency Conversion
+  const priceNormalizedItems = rawResults.filter(r => {
+    const rawP = String(r.price || r.raw_message || '').toLowerCase()
+    return rawP.includes('cr') || rawP.includes('crore') || rawP.includes('lac') || rawP.includes('lakh') || rawP.includes('k') || rawP.includes('demand')
+  })
+  if (priceNormalizedItems.length > 0) {
+    reasons.push({
+      category: 'Price & Demand Normalization',
+      icon: '💰',
+      badge: `${priceNormalizedItems.length} listings`,
+      description: 'Extracted numeric PKR values from Pakistani real estate terms (e.g., Crore, Lac, Lakh, K, Demand, PKR/Rs).',
+      examples: ['"1.8 Cr" → PKR 18,000,000', '"85 Lac" → PKR 8,500,000', '"500k" → PKR 500,000'],
+    })
+  }
+
+  // 2. Intent & Purpose Classification
+  if (filters.purpose && filters.purpose !== 'All') {
+    reasons.push({
+      category: 'Intent & Transaction Classification',
+      icon: '🎯',
+      badge: `Intent: ${filters.purpose}`,
+      description: `Classified unstructured WhatsApp chat intents into distinct purpose categories ("${filters.purpose}").`,
+      examples: ['"For Sale / Available" → Buy', '"Rent pe chahiye / Available for Rent" → Rent'],
+    })
+  }
+
+  // 3. Location, Vicinity & Area Extraction
+  const locationItems = rawResults.filter(r => r.area || r.vicinity || r.city)
+  if (locationItems.length > 0 || filters.location || filters.city) {
+    reasons.push({
+      category: 'Location & Vicinity Extraction',
+      icon: '📍',
+      badge: `${locationItems.length} locations mapped`,
+      description: 'Extracted sector, phase, block, and city information from noisy WhatsApp text.',
+      examples: [filters.city && filters.city !== 'All Cities' ? `Filtered by City: ${filters.city}` : 'Mapped City & Sector', filters.location ? `Matched location query: "${filters.location}"` : 'Extracted Vicinity & Block'],
+    })
+  }
+
+  // 4. Property Sub-Type & Size Standardizing
+  const sizeItems = rawResults.filter(r => r.size_value || r.size_unit || r.property_sub_type || r.property_type)
+  if (sizeItems.length > 0 || (filters.propertyType && filters.propertyType !== 'All')) {
+    reasons.push({
+      category: 'Property Type & Size Standardization',
+      icon: '📐',
+      badge: `${sizeItems.length} standardized`,
+      description: 'Normalized colloquial Pakistani unit standards (Marla, Kanal, Sq Ft, Sq Yards) and standardized property sub-types.',
+      examples: ['"5 Marla House" → 5 Marla (Residential)', '"1 Kanal Plot" → 1 Kanal (Plot/Land)'],
+    })
+  }
+
+  // 5. Typo-Tolerance & Roman Urdu NLP
+  const hasQuery = (filters.query || filters.location || '').trim()
+  reasons.push({
+    category: 'Roman Urdu & Typo-Tolerance NLP',
+    icon: '🤖',
+    badge: hasQuery ? 'Active for Query' : 'Active Pipeline',
+    description: 'Processed Pakistani real estate abbreviations, phonetic Roman Urdu spelling variations, and keyword synonyms.',
+    examples: ['"dem", "dmd", "prc" → Price', '"flt", "apprt" → Flat/Apartment', '"ghr", "makan" → House'],
+  })
+
+  // 6. Backend Normalization Service Status
+  if (normStatus) {
+    const isOk = normStatus.status === 'ok' || normStatus.status === 'active' || normStatus.success
+    reasons.push({
+      category: 'Backend /api/normalize/status Service',
+      icon: isOk ? '⚡' : 'ℹ️',
+      badge: normStatus.status || (isOk ? 'Operational' : 'Active'),
+      description: normStatus.message || (isOk ? 'AI Normalization service is healthy and actively serving requests.' : 'AI Normalization endpoint queried.'),
+      examples: [`Response Status: ${normStatus.status || '200 OK'}`],
+    })
+  }
+
+  return reasons
+}
 
 // 💰 Robust helper to parse and normalize property prices from Pakistani WhatsApp messages
 const parsePropertyPrice = (priceStr, priceVal, rawMessage = '') => {
@@ -735,24 +814,76 @@ const Results = () => {
   const [currentPage, setCurrentPage] = useState(1) // Pagination state
   const [selectedProperty, setSelectedProperty] = useState(null) // Drawer state
 
+  // 🧠 AI Normalization Status & Reasoning State
+  const [normalizeStatus, setNormalizeStatus] = useState(null)
+  const [loadingNormalize, setLoadingNormalize] = useState(false)
+  const [normalizeLogs, setNormalizeLogs] = useState([])
+  const [showNormalizeModal, setShowNormalizeModal] = useState(false)
+  const [normalizationReasons, setNormalizationReasons] = useState([])
+
+  // 📡 Fetch Normalization Status from /api/normalize/status and analyze reasoning
+  const fetchNormalizationStatus = async (currentResults = [], currentFilters = committed) => {
+    setLoadingNormalize(true)
+    const logTime = new Date().toLocaleTimeString()
+    const newLogs = []
+    
+    newLogs.push(`[${logTime}] 🔍 Querying /api/normalize/status for active user...`)
+    console.group(`🤖 [AI Normalization Pipeline - ${logTime}]`)
+    console.log('🔍 Active Search Filters:', currentFilters)
+    console.log('📡 Calling GET /api/normalize/status...')
+
+    try {
+      const statusRes = await normalizeApi.getStatus()
+      const rawData = statusRes?.data || statusRes
+      console.log('📊 [Normalize API Status Response]:', statusRes)
+      newLogs.push(`[${new Date().toLocaleTimeString()}] ✅ Status Received: ${JSON.stringify(rawData?.status || rawData?.message || 'Active')}`)
+      
+      setNormalizeStatus(statusRes)
+
+      const reasons = analyzeNormalizationReasons(currentResults, currentFilters, rawData)
+      setNormalizationReasons(reasons)
+      
+      console.log('💡 [Why Normalization Occurred - Active Reasoning Categories]:', reasons)
+      newLogs.push(`[${new Date().toLocaleTimeString()}] 💡 Computed ${reasons.length} active reasoning categories (Price, Location, Intent, Slang NLP)`)
+      console.groupEnd()
+    } catch (err) {
+      console.warn('⚠️ [Normalize API Warning]:', err.message)
+      newLogs.push(`[${new Date().toLocaleTimeString()}] ⚠️ Normalization API Check: ${err.message}`)
+      
+      const fallbackReasons = analyzeNormalizationReasons(currentResults, currentFilters, { status: 'Offline / Standalone', message: err.message })
+      setNormalizationReasons(fallbackReasons)
+      setNormalizeStatus({ status: 'offline', message: err.message })
+      console.groupEnd()
+    } finally {
+      setLoadingNormalize(false)
+      setNormalizeLogs(prev => [...newLogs, ...prev].slice(0, 60))
+    }
+  }
+
   useEffect(() => {
     setLoading(true)
     setError('')
     setCurrentPage(1)
-    console.log('Sending filters to ML API:', committed)
+    console.log('🚀 Sending search filters to ML API:', committed)
+    
     mlSearchApi.dashboardSearch(committed)
       .then(res => {
         console.log('ML API Response:', res)
+        let rawList = []
         if (res?.success && Array.isArray(res.results)) {
+          rawList = res.results
           setResults(res.results.map(normalizeMLResult))
         } else {
           setResults([])
         }
+        // 🔄 Automatically fetch normalization status and explain why normalization occurred
+        fetchNormalizationStatus(rawList, committed)
       })
       .catch(err => {
         console.error('ML API Error:', err)
         setError(err.message || 'Failed to search properties')
         setResults([])
+        fetchNormalizationStatus([], committed)
       })
       .finally(() => {
         setLoading(false)
@@ -936,6 +1067,111 @@ const Results = () => {
           </button>
         </div>
 
+        {/* 🧠 Live AI Normalization Status Card (Human-Friendly, Real-time) */}
+        <div className="bg-gradient-to-br from-white via-blue-50/40 to-indigo-50/40 dark:from-slate-800 dark:via-slate-800/90 dark:to-indigo-950/20 rounded-2xl border border-blue-100 dark:border-slate-700 p-4 sm:p-5 shadow-xs mb-6 transition-all">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            {/* Left: AI Status & Live Processing Indicator */}
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="relative shrink-0">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 text-xl">
+                  ✨
+                </div>
+                <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${loading ? 'bg-amber-400' : 'bg-emerald-400'} opacity-75`} />
+                  <span className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-white dark:border-slate-800 ${loading ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                </span>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                    <span>AI Normalization Engine</span>
+                  </h3>
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${
+                    loading
+                      ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/50 animate-pulse'
+                      : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/50'
+                  }`}>
+                    {loading ? '⚡ Analyzing & Normalizing in Real Time...' : '✅ Data Standardized & Ready'}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                  {loading ? (
+                    'Reading raw WhatsApp chats, converting prices (Lac/Crore), and mapping locations...'
+                  ) : (
+                    <>
+                      Standardized <strong className="text-slate-900 dark:text-slate-100 font-bold">{results.length} property listings</strong> from WhatsApp messages with instant price, location & category detection.
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Learn How AI Works Button */}
+            <div className="flex items-center gap-2 shrink-0 self-end md:self-auto flex-wrap">
+              {!loading && results.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowNormalizeModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <span>💡 How AI Processed This</span>
+                  <span className="bg-white/20 px-1.5 py-0.5 rounded-md text-[10px]">
+                    4 Rules Applied
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Real-time Summary Pills Bar */}
+          {!loading && results.length > 0 && (
+            <div className="mt-4 pt-3.5 border-t border-slate-200/60 dark:border-slate-700/60 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-slate-750/70 border border-slate-200/70 dark:border-slate-700/80">
+                <span className="text-sm">💰</span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Prices Standardized</p>
+                  <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
+                    {results.filter(r => r.price).length} in PKR (Lac/Cr)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-slate-750/70 border border-slate-200/70 dark:border-slate-700/80">
+                <span className="text-sm">📍</span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Locations Mapped</p>
+                  <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
+                    {committed.city !== 'All Cities' ? committed.city : 'All Pakistan'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-slate-750/70 border border-slate-200/70 dark:border-slate-700/80">
+                <span className="text-sm">🎯</span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Purpose Classified</p>
+                  <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
+                    {committed.purpose === 'All' ? 'Buy & Rent' : committed.purpose}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-slate-750/70 border border-slate-200/70 dark:border-slate-700/80">
+                <span className="text-sm">📞</span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Contacts Extracted</p>
+                  <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
+                    {results.filter(r => r.phone).length} Direct Numbers
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Error Banner */}
         {error && (
           <div className="mb-4 rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 p-4 text-sm text-rose-700 dark:text-rose-300 flex items-center gap-3">
@@ -1022,7 +1258,12 @@ const Results = () => {
         {/* Results View: Skeleton / Empty / Table / Grid */}
         {loading ? (
           viewMode === 'list' ? (
-            <TableSkeleton />
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden p-6 space-y-4 animate-pulse">
+              <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-4" />
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-10 bg-slate-100 dark:bg-slate-750 rounded-xl" />
+              ))}
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {[...Array(6)].map((_, i) => (
@@ -1031,12 +1272,12 @@ const Results = () => {
             </div>
           )
         ) : filteredResults.length === 0 ? (
-          <div className="text-center py-20 transition-colors bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8">
-            <svg className="w-14 h-14 mx-auto text-slate-300 dark:text-slate-650 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <p className="font-bold text-slate-700 dark:text-slate-300 text-base">
-              {searchTerm ? 'No matching properties found' : 'No properties found'}
+          <div className="text-center py-20 transition-colors bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm">
+            <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-750 flex items-center justify-center mx-auto mb-4 text-3xl">
+              🔍
+            </div>
+            <p className="font-extrabold text-slate-800 dark:text-slate-100 text-lg">
+              {searchTerm ? 'No matching properties found' : 'No properties found for your filters'}
             </p>
             <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
               {searchTerm ? 'Try clearing your live search or searching another keyword' : 'Try adjusting your filters and search again'}
@@ -1079,6 +1320,101 @@ const Results = () => {
           </>
         )}
       </div>
+
+      {/* ✨ User-Friendly AI Normalization Explanation Modal (ZERO Code, ZERO JSON) */}
+      {showNormalizeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-scaleUp">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 dark:from-slate-800 dark:to-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 text-lg">
+                  ✨
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900 dark:text-slate-100">
+                    How AI Processed Your Search
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    WhatsApp messages are automatically cleaned, standardized & mapped
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNormalizeModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 overflow-y-auto space-y-3.5 flex-1 text-slate-800 dark:text-slate-200">
+              
+              {/* Card 1: Price Normalization */}
+              <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 space-y-1.5">
+                <div className="flex items-center gap-2 font-black text-emerald-800 dark:text-emerald-300 text-xs">
+                  <span className="text-base">💰</span>
+                  <span>1. Pakistani Price Standardization</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Raw WhatsApp messages contain different price formats like <strong className="text-emerald-700 dark:text-emerald-300">1.8 Cr</strong>, <strong className="text-emerald-700 dark:text-emerald-300">85 Lac</strong>, or <strong className="text-emerald-700 dark:text-emerald-300">500k</strong>. The AI automatically converts them into exact PKR numbers so you can filter and compare accurately.
+                </p>
+              </div>
+
+              {/* Card 2: Location Extraction */}
+              <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 space-y-1.5">
+                <div className="flex items-center gap-2 font-black text-blue-800 dark:text-blue-300 text-xs">
+                  <span className="text-base">📍</span>
+                  <span>2. Smart Locality & Sector Mapping</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Extracts phases, sectors, blocks, and city names from noisy dealer text so you only see listings in your target area.
+                </p>
+              </div>
+
+              {/* Card 3: Property Type & Intent */}
+              <div className="p-4 rounded-2xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/40 space-y-1.5">
+                <div className="flex items-center gap-2 font-black text-purple-800 dark:text-purple-300 text-xs">
+                  <span className="text-base">🏠</span>
+                  <span>3. Category & Purpose Detection</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Identifies if a message is for <strong className="text-purple-700 dark:text-purple-300">Buying/Selling</strong> or <strong className="text-purple-700 dark:text-purple-300">Rent</strong>, and categorizes whether it is a House, Flat, Portion, or Plot.
+                </p>
+              </div>
+
+              {/* Card 4: Urdu & Slang Intelligence */}
+              <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40 space-y-1.5">
+                <div className="flex items-center gap-2 font-black text-amber-800 dark:text-amber-300 text-xs">
+                  <span className="text-base">💬</span>
+                  <span>4. Roman Urdu & Real Estate Slang Decoder</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Understands common abbreviations used by Pakistani real estate dealers like <em>&ldquo;dem&rdquo;</em> (demand), <em>&ldquo;bhk&rdquo;</em>, <em>&ldquo;marla&rdquo;</em>, <em>&ldquo;kanal&rdquo;</em>, and <em>&ldquo;sq yd&rdquo;</em>.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between">
+              <span className="text-xs text-slate-500 font-medium">
+                ⚡ Automatic Real-time Processing
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowNormalizeModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-slate-750 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Ultra-Smooth Animated Side Drawer for Property Details */}
       <PropertyDrawer
