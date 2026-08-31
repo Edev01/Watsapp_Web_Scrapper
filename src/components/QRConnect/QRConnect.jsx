@@ -20,7 +20,7 @@ const formatRelativeTime = (dateStr) => {
   if (!dateStr) return 'Recently'
   const date = new Date(dateStr)
   if (isNaN(date.getTime())) return 'Recently'
-  
+
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
   if (seconds < 5) return 'Just now'
   if (seconds < 60) return `${seconds}s ago`
@@ -65,56 +65,74 @@ const QRConnect = () => {
     }
   }, [])
 
-  // 🔄 Fetch latest QR Code for logged-in user
+  // 🔄 Fetch latest QR Code for logged-in user (Parallel execution for speed)
   const fetchQR = useCallback(async (silent = false) => {
     if (!silent && isInitialFetch.current) {
       setStatus(STATUS.LOADING)
     }
 
-    // First check if user is already connected
-    const isAlreadyConnected = await checkConnectionStatus()
-    if (isAlreadyConnected) {
-      isInitialFetch.current = false
-      return
-    }
+    const userId = getLoggedInUserId()
+    const queryParams = new URLSearchParams({ t: Date.now() })
+    if (userId) queryParams.append('userId', userId)
+    const cacheBustUrl = `${API_URL}?${queryParams.toString()}`
 
-    try {
-      const userId = getLoggedInUserId()
-      const queryParams = new URLSearchParams({ t: Date.now() })
-      if (userId) {
-        queryParams.append('userId', userId)
-      }
-
-      const cacheBustUrl = `${API_URL}?${queryParams.toString()}`
-      const res = await fetch(cacheBustUrl, {
+    // 🚀 Parallel check: Connection status + QR Code simultaneously
+    const [connectionResult, qrResult] = await Promise.allSettled([
+      (async () => {
+        try {
+          setCheckingStatus(true)
+          const res = await qrApi.getConnectionStatus()
+          const data = res?.data || res
+          setConnectionDetails(data)
+          setCheckingStatus(false)
+          return data
+        } catch (err) {
+          setCheckingStatus(false)
+          return null
+        }
+      })(),
+      fetch(cacheBustUrl, {
         headers: {
           'bypass-tunnel-reminder': 'true',
           'Pragma': 'no-cache',
           'Cache-Control': 'no-cache, no-store, must-revalidate'
         }
-      })
+      }).then(res => res.json().then(json => ({ status: res.status, ok: res.ok, json })).catch(() => ({ status: res.status, ok: res.ok, json: null })))
+    ])
 
-      const json = await res.json().catch(() => null)
+    // Process connection status first
+    const connData = connectionResult.status === 'fulfilled' ? connectionResult.value : null
+    if (connData?.linked === true || connData?.status === 'connected' || connData?.status === 'authenticated') {
+      setStatus(STATUS.CONNECTED)
+      setQrData(null)
+      setErrorMsg('')
+      isInitialFetch.current = false
+      return
+    }
 
-      // Handle 404 or "No QR found" messages — skip only if there's truly no QR URL
+    // Process QR result
+    try {
+      if (qrResult.status !== 'fulfilled' || !qrResult.value) {
+        throw new Error('QR fetch failed')
+      }
+
+      const { status: resStatus, ok: resOk, json } = qrResult.value
+
       const rawDataCheck = Array.isArray(json?.data) ? json.data[0] : (json?.data || json)
       const hasQrUrl = !!(rawDataCheck?.url || rawDataCheck?.qr || json?.url || json?.qr)
 
-      if (res.status === 404 || json?.message === 'No fresh QR URL found') {
+      if (resStatus === 404 || json?.message === 'No fresh QR URL found') {
         setStatus(prev => (prev === STATUS.CONNECTED ? prev : STATUS.LOADING))
         return
       }
 
-      // If backend says "waiting" but has NO QR URL yet, keep loading
       if (json?.data?.status === 'waiting' && !hasQrUrl) {
         setStatus(prev => (prev === STATUS.CONNECTED ? prev : STATUS.LOADING))
         return
       }
-      // If status is "waiting" but QR URL IS present, fall through and display it
 
-      if (!res.ok) throw new Error(json?.message || `Server error: ${res.status}`)
+      if (!resOk) throw new Error(json?.message || `Server error: ${resStatus}`)
 
-      // Handle array or object structure
       const rawData = Array.isArray(json?.data) ? json.data[0] : (json?.data || json)
       const qrCode = rawData?.url || rawData?.qr || json?.url || json?.qr || '';
 
@@ -137,7 +155,6 @@ const QRConnect = () => {
       isInitialFetch.current = false
     } catch (err) {
       console.error('QR fetch error:', err.message)
-      // Only show error if not a 404 / waiting status and no active QR
       if (isInitialFetch.current && !qrData) {
         if (!err.message?.includes('404') && !err.message?.includes('fresh QR')) {
           setStatus(STATUS.ERROR)
@@ -145,7 +162,7 @@ const QRConnect = () => {
         }
       }
     }
-  }, [checkConnectionStatus, qrData])
+  }, [qrData])
 
   // ⚡ Socket.IO live sync for real-time QR updates & connection events
   useEffect(() => {
@@ -176,7 +193,7 @@ const QRConnect = () => {
       // Listen for 'new_qr' event from backend
       socket.on('new_qr', (data) => {
         console.log("new_qr_data", data);
-        
+
         const rawData = Array.isArray(data) ? data[0] : data
         const qrCode = typeof rawData === 'string'
           ? rawData
@@ -216,16 +233,17 @@ const QRConnect = () => {
     }
   }, [checkConnectionStatus])
 
-  // Initial fetch + Auto polling every 5 seconds as fallback
+  // ⚡ Adaptive fast polling: Every 1.2s when waiting for QR, 6s when already displayed
   useEffect(() => {
     fetchQR(false)
 
+    const pollSpeed = status === STATUS.LOADING ? 1200 : 6000
     const interval = setInterval(() => {
       fetchQR(true)
-    }, POLL_INTERVAL)
+    }, pollSpeed)
 
     return () => clearInterval(interval)
-  }, [fetchQR])
+  }, [fetchQR, status])
 
   // Update relative time readout every 5 seconds
   useEffect(() => {
@@ -254,12 +272,29 @@ const QRConnect = () => {
       {/* QR Code / Active Connection Details Box */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 shadow-sm flex flex-col items-center justify-center min-h-[380px] transition-colors relative">
 
-        {/* LOADING STATE */}
+        {/* SKELETON LOADING STATE */}
         {status === STATUS.LOADING && (
-          <div className="text-center py-8">
-            <div className="w-14 h-14 rounded-full border-4 border-emerald-200 border-t-emerald-500 animate-spin mx-auto mb-4" />
-            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Generating WhatsApp QR Code...</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Connecting to WhatsApp server and preparing fresh QR code</p>
+          <div className="text-center flex flex-col items-center w-full animate-pulse">
+            {/* Live sync badge skeleton */}
+            <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-full w-36 mb-4" />
+
+            {/* QR Code Container Skeleton */}
+            <div className="w-[252px] h-[252px] p-4 bg-slate-100 dark:bg-slate-700/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center relative overflow-hidden">
+              <div className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-2">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h3v3h-3v-3zM13.5 19.5h3v.75h-3v-.75zM19.5 13.5h.75v3h-.75v-3zM16.5 16.5h3v3h-3v-3zM19.5 19.5h.75v.75h-.75v-.75z" />
+                </svg>
+              </div>
+              <div className="h-3 bg-slate-200 dark:bg-slate-650 rounded w-28 mb-1.5" />
+              <div className="h-2 bg-slate-200 dark:bg-slate-650 rounded w-20" />
+            </div>
+
+            {/* Instruction skeleton */}
+            <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-60 mt-4" />
+
+            {/* Subtext skeleton */}
+            <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-36 mt-2" />
           </div>
         )}
 
@@ -268,7 +303,7 @@ const QRConnect = () => {
           <div className="text-center flex flex-col items-center w-full py-2">
             <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center mx-auto mb-4 text-emerald-600 dark:text-emerald-400 shadow-inner">
               <svg className="w-9 h-9" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
               </svg>
             </div>
 
@@ -330,9 +365,9 @@ const QRConnect = () => {
 
             {/* Actions */}
             <div className="flex items-center gap-3 w-full">
-              <button 
+              <button
                 type="button"
-                onClick={checkConnectionStatus} 
+                onClick={checkConnectionStatus}
                 disabled={checkingStatus}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs transition-colors cursor-pointer disabled:opacity-60"
               >
@@ -342,9 +377,9 @@ const QRConnect = () => {
                 <span>Check Status</span>
               </button>
 
-              <button 
+              <button
                 type="button"
-                onClick={() => fetchQR(false)} 
+                onClick={() => fetchQR(false)}
                 className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-xs transition-colors cursor-pointer"
               >
                 Relink QR
@@ -378,7 +413,7 @@ const QRConnect = () => {
             <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-4">
               Open WhatsApp › Linked Devices › Link a Device
             </p>
-            
+
             <div className="flex items-center justify-center gap-3 mt-2">
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
                 Last updated: <span className="font-semibold text-slate-600 dark:text-slate-400">{lastUpdatedText}</span>
@@ -410,9 +445,9 @@ const QRConnect = () => {
             </div>
             <p className="text-sm font-bold text-rose-600 dark:text-rose-400 mb-1">Server Connection Failed</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-[220px] mx-auto">{errorMsg}</p>
-            <button 
+            <button
               type="button"
-              onClick={() => fetchQR(false)} 
+              onClick={() => fetchQR(false)}
               className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-emerald-500 transition-colors shadow-sm"
             >
               Retry Connection

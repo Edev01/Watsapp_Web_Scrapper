@@ -41,44 +41,23 @@ const SkeletonLoading = ({ tab }) => {
 
   if (tab === 'connect') {
     return (
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-5 gap-6 animate-pulse">
-        {/* QR Code Container */}
-        <div className="md:col-span-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 flex flex-col items-center justify-center space-y-6 min-h-[400px]">
-          <div className="space-y-2 text-center w-full">
-            <div className="h-6 bg-slate-300 dark:bg-slate-600 rounded w-48 mx-auto" />
-            <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-64 mx-auto" />
-          </div>
-          <div className="w-56 h-56 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-750 flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900/40">
-            <div className="w-44 h-44 bg-slate-200 dark:bg-slate-700 rounded-xl" />
-          </div>
-          <div className="h-10 bg-slate-300 dark:bg-slate-650 rounded-xl w-40" />
+      <div className="p-4 sm:p-8 max-w-xl mx-auto text-center animate-pulse">
+        {/* Header Skeleton */}
+        <div className="mb-6 space-y-2">
+          <div className="h-7 bg-slate-300 dark:bg-slate-600 rounded-xl w-56 mx-auto" />
+          <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded-lg w-80 max-w-full mx-auto" />
         </div>
 
-        {/* Info panel */}
-        <div className="md:col-span-2 space-y-6">
-          {/* Instructions */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
-            <div className="h-4.5 bg-slate-300 dark:bg-slate-600 rounded w-32" />
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="flex gap-3">
-                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 bg-slate-250 dark:bg-slate-650 rounded w-5/6" />
-                  <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded w-2/3" />
-                </div>
-              </div>
-            ))}
+        {/* QR Code Container Skeleton */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 shadow-sm flex flex-col items-center justify-center min-h-[380px]">
+          <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-full w-36 mb-4" />
+          <div className="w-[240px] h-[240px] p-4 bg-slate-100 dark:bg-slate-700/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center relative">
+            <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-600 mb-2" />
+            <div className="h-3 bg-slate-200 dark:bg-slate-600 rounded w-28 mb-1.5" />
+            <div className="h-2 bg-slate-200 dark:bg-slate-600 rounded w-20" />
           </div>
-
-          {/* Connection status */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-3">
-            <div className="h-4 bg-slate-350 dark:bg-slate-600 rounded w-36" />
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-              <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-24" />
-            </div>
-            <div className="h-3 bg-slate-150 dark:bg-slate-750 rounded w-48" />
-          </div>
+          <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-56 mt-4" />
+          <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-36 mt-2" />
         </div>
       </div>
     )

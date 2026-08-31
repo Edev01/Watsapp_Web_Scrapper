@@ -5,8 +5,12 @@ const extractList = (payload) => {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.data)) return payload.data
   if (Array.isArray(payload?.chats)) return payload.chats
+  if (Array.isArray(payload?.results)) return payload.results
+  if (Array.isArray(payload?.items)) return payload.items
   if (Array.isArray(payload?.messages)) return payload.messages
   if (Array.isArray(payload?.data?.chats)) return payload.data.chats
+  if (Array.isArray(payload?.data?.results)) return payload.data.results
+  if (Array.isArray(payload?.data?.items)) return payload.data.items
   if (Array.isArray(payload?.data?.messages)) return payload.data.messages
   return []
 }
@@ -282,6 +286,9 @@ const ScrapedChats = ({ setToast }) => {
   const [chatFilter, setChatFilter] = useState('all')
   const [loadingChats, setLoadingChats] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [chatPage, setChatPage] = useState(1)
+  const [hasMoreChats, setHasMoreChats] = useState(true)
+  const [loadingMoreChats, setLoadingMoreChats] = useState(false)
   const [monitoringIds, setMonitoringIds] = useState([])
   const [deletingJids, setDeletingJids] = useState([])
   const [deletingMessageIds, setDeletingMessageIds] = useState([])
@@ -476,15 +483,22 @@ const ScrapedChats = ({ setToast }) => {
   const loadChats = useCallback(async () => {
     setLoadingChats(true)
     setError('')
+    setChatPage(1)
+    setHasMoreChats(true)
 
     const [allChatsResult, monitoredResult] = await Promise.allSettled([
-      scrapedChatsApi.getChats(),
+      scrapedChatsApi.getChats({ type: 'chats', page: 1, pageSize: 50 }),
       scrapedChatsApi.getMonitoredChats(),
     ])
 
-    const allChats = allChatsResult.status === 'fulfilled'
-      ? extractList(allChatsResult.value).map(normalizeChat).filter(chat => chat.jid)
+    const rawAllChats = allChatsResult.status === 'fulfilled'
+      ? extractList(allChatsResult.value)
       : []
+    const allChats = rawAllChats.map(normalizeChat).filter(chat => chat.jid)
+
+    if (rawAllChats.length < 50) {
+      setHasMoreChats(false)
+    }
 
     const monitoredChats = monitoredResult.status === 'fulfilled'
       ? extractList(monitoredResult.value).map(normalizeChat).filter(chat => chat.jid)
@@ -518,6 +532,51 @@ const ScrapedChats = ({ setToast }) => {
 
     setLoadingChats(false)
   }, [])
+
+  // 📜 Infinite Scroll: Load Next 50 Chats when user scrolls to bottom
+  const loadMoreChats = useCallback(async () => {
+    if (loadingMoreChats || loadingChats || !hasMoreChats) return
+
+    setLoadingMoreChats(true)
+    const nextPage = chatPage + 1
+
+    try {
+      const response = await scrapedChatsApi.getChats({
+        type: 'chats',
+        page: nextPage,
+        pageSize: 50,
+      })
+
+      const rawNewChats = extractList(response)
+      const newChats = rawNewChats.map(normalizeChat).filter(chat => chat.jid)
+
+      if (rawNewChats.length < 50 || newChats.length === 0) {
+        setHasMoreChats(false)
+      }
+
+      if (newChats.length > 0) {
+        setChats(prevChats => {
+          const existingJids = new Set(prevChats.map(c => c.jid))
+          const uniqueNewChats = newChats.filter(c => !existingJids.has(c.jid))
+          return [...prevChats, ...uniqueNewChats]
+        })
+        setChatPage(nextPage)
+      }
+    } catch (err) {
+      console.warn('Failed to load more chats on scroll:', err.message)
+    } finally {
+      setLoadingMoreChats(false)
+    }
+  }, [chatPage, hasMoreChats, loadingChats, loadingMoreChats])
+
+  // Scroll listener for chat list container
+  const handleChatListScroll = useCallback((e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    // When within 120px of the bottom, fetch next 50 chats
+    if (scrollHeight - scrollTop - clientHeight < 120) {
+      loadMoreChats()
+    }
+  }, [loadMoreChats])
 
   const loadMessages = useCallback(async (chatId) => {
     if (!chatId) {
@@ -1180,7 +1239,7 @@ const ScrapedChats = ({ setToast }) => {
             </p>
           </div>
 
-          <div ref={chatListContainerRef} className="flex-1 overflow-y-auto">
+          <div ref={chatListContainerRef} onScroll={handleChatListScroll} className="flex-1 overflow-y-auto">
             {loadingChats ? (
               <div className="p-4 space-y-3 animate-pulse">
                 {[1, 2, 3].map(item => (
@@ -1372,6 +1431,20 @@ const ScrapedChats = ({ setToast }) => {
                     </div>
                   )
                 })}
+
+                {/* Bottom loader when fetching more chats on scroll */}
+                {loadingMoreChats && (
+                  <div className="p-3.5 flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50/60 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-700/60">
+                    <div className="w-3.5 h-3.5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+                    <span className="font-semibold text-[11px]">Loading next 50 chats...</span>
+                  </div>
+                )}
+
+                {!hasMoreChats && visibleChats.length > 0 && (
+                  <div className="py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700/40">
+                    All {visibleChats.length} chats loaded
+                  </div>
+                )}
               </div>
             )}
           </div>

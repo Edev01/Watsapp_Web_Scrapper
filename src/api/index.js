@@ -75,9 +75,27 @@ export const qrApi = {
 };
 
 export const scrapedChatsApi = {
-  getChats: () => {
+  getChats: (options = {}) => {
     const userId = getLoggedInUserId()
-    const url = userId ? `${API_ENDPOINTS.scrapedChats}?userId=${userId}` : API_ENDPOINTS.scrapedChats
+    const params = new URLSearchParams()
+    
+    // Default pagination & filter parameters
+    params.append('type', options.type || 'chats')
+    params.append('page', options.page ?? 1)
+    params.append('pageSize', options.pageSize ?? 50)
+
+    if (userId) {
+      params.append('userId', userId)
+    }
+
+    // Append any extra query parameters if provided
+    Object.entries(options).forEach(([key, val]) => {
+      if (!['type', 'page', 'pageSize', 'userId'].includes(key) && val !== undefined && val !== null) {
+        params.append(key, val)
+      }
+    })
+
+    const url = `${API_ENDPOINTS.scrapedChats}?${params.toString()}`
     return apiRequest(url)
   },
   getMessages: (chatId) => {

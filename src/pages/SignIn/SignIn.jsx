@@ -62,11 +62,11 @@ const SignIn = ({ setAuthUser, setToast }) => {
 
         if (response.ok) {
           const resJson = await response.json();
-          const token = resJson.token || 
-                        resJson.accessToken || 
-                        resJson.data?.token || 
-                        resJson.data?.accessToken || 
-                        '';
+          const token = resJson.token ||
+            resJson.accessToken ||
+            resJson.data?.token ||
+            resJson.data?.accessToken ||
+            '';
           if (token) {
             localStorage.setItem('authToken', token);
           }
@@ -201,9 +201,8 @@ const SignIn = ({ setAuthUser, setToast }) => {
               name="email"
               value={signInData.email}
               onChange={handleChange}
-              className={`w-full pl-11 pr-4 py-3 rounded-xl border glass-input focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 floating-input ${
-                errors.email ? 'border-rose-500 ring-rose-500/20 floating-input-error' : 'border-slate-200'
-              }`}
+              className={`w-full pl-11 pr-4 py-3 rounded-xl border glass-input focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 floating-input ${errors.email ? 'border-rose-500 ring-rose-500/20 floating-input-error' : 'border-slate-200'
+                }`}
               placeholder=" "
             />
             <label htmlFor="signin-email" className="floating-label">Email Address</label>
@@ -242,9 +241,8 @@ const SignIn = ({ setAuthUser, setToast }) => {
               name="password"
               value={signInData.password}
               onChange={handleChange}
-              className={`w-full pl-11 pr-11 py-3 rounded-xl border glass-input focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 floating-input ${
-                errors.password ? 'border-rose-500 ring-rose-500/20 floating-input-error' : 'border-slate-200'
-              }`}
+              className={`w-full pl-11 pr-11 py-3 rounded-xl border glass-input focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm transition-all text-slate-900 floating-input ${errors.password ? 'border-rose-500 ring-rose-500/20 floating-input-error' : 'border-slate-200'
+                }`}
               placeholder=" "
             />
             <button

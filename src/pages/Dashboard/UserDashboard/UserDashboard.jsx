@@ -6,8 +6,8 @@ import QRConnect from '../../../components/QRConnect/QRConnect'
 import Header from '../../../components/Header/Header'
 import SkeletonLoading from '../../../components/SkeletonLoading/SkeletonLoading'
 import ScrapedChats from '../../../components/ScrapedChats/ScrapedChats'
-
 import ResetPassword from '../../../components/ResetPassword/ResetPassword'
+import { API_ENDPOINTS } from '../../../api'
 
 const ExpiredSubscriptionOverlay = ({ user, subInfo }) => (
   <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
@@ -20,9 +20,9 @@ const ExpiredSubscriptionOverlay = ({ user, subInfo }) => (
     <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100 mb-2">
       6-Month Subscription Expired
     </h2>
-    
+
     <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
-      Your 6-Month WhatsApp Scraping access ended on <strong className="text-slate-700 dark:text-slate-200">{subInfo.endDateStr}</strong>. 
+      Your 6-Month WhatsApp Scraping access ended on <strong className="text-slate-700 dark:text-slate-200">{subInfo.endDateStr}</strong>.
       To continue scanning WhatsApp QR codes and scraping chat listings, please contact your Administrator to renew your subscription.
     </p>
 
@@ -79,8 +79,6 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
     }
     return DEFAULT_FILTERS
   })
-  const [tabLoading, setTabLoading] = useState(true)
-
   useEffect(() => {
     localStorage.setItem('user_active_tab', activeTab)
   }, [activeTab])
@@ -88,6 +86,19 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   useEffect(() => {
     localStorage.setItem('property_search_filters', JSON.stringify(filters))
   }, [filters])
+
+  // 🚀 Background Pre-warm WhatsApp QR session as soon as Dashboard opens
+  useEffect(() => {
+    try {
+      const userId = user?.id || user?._id || user?.userId
+      if (userId) {
+        const queryParams = new URLSearchParams({ userId, t: Date.now() })
+        fetch(`${API_ENDPOINTS.qrLatest}?${queryParams.toString()}`, {
+          headers: { 'bypass-tunnel-reminder': 'true' }
+        }).catch(() => {})
+      }
+    } catch (e) {}
+  }, [user])
 
   const handleSearch = (appliedFilters) => {
     navigate('/results', { state: { filters: appliedFilters } })
@@ -100,7 +111,7 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
 
     const localUsers = JSON.parse(localStorage.getItem('local_users') || '[]')
     const localUser = localUsers.find(u => u.email?.toLowerCase() === user.email?.toLowerCase())
-    
+
     const subEndDateStr = localUser?.subscriptionEndDate || user?.subscriptionEndDate
 
     let endDate = subEndDateStr ? new Date(subEndDateStr) : null
@@ -121,15 +132,6 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   }
 
   const subInfo = getSubInfo()
-
-  // Trigger loading skeleton on tab change
-  useEffect(() => {
-    setTabLoading(true)
-    const timer = setTimeout(() => {
-      setTabLoading(false)
-    }, 600)
-    return () => clearTimeout(timer)
-  }, [activeTab])
 
   return (
     <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 overflow-hidden transition-colors">
@@ -152,45 +154,39 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
           user={user}
         />
         <main className="flex-1 overflow-y-auto">
-          {tabLoading ? (
-            <SkeletonLoading tab={activeTab} />
-          ) : (
-            <>
-              {activeTab === 'search' && (
-                <div className="p-4 sm:p-6 max-w-7xl w-full mx-auto">
-                  <div className="mb-5">
-                    <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">Search Properties</h1>
-                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Set your filters and click Search to view results</p>
-                  </div>
-                  <PropertyFilters
-                    filters={filters}
-                    setFilters={setFilters}
-                    resultCount={null}
-                    onSearch={handleSearch}
-                  />
-                </div>
-              )}
-              {activeTab === 'connect' && (
-                subInfo.isExpired 
-                  ? <ExpiredSubscriptionOverlay user={user} subInfo={subInfo} />
-                  : <QRConnect />
-              )}
-              {activeTab === 'scrapedChats' && (
-                subInfo.isExpired 
-                  ? <ExpiredSubscriptionOverlay user={user} subInfo={subInfo} />
-                  : <ScrapedChats setToast={setToast} />
-              )}
-              {activeTab === 'resetPassword' && <ResetPassword setToast={setToast} />}
-              {activeTab === 'saved' && (
-                <div className="p-6 text-center mt-16">
-                  <svg className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  <p className="font-bold text-slate-600 dark:text-slate-350">No saved listings yet</p>
-                  <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Click the heart icon on any property to save it</p>
-                </div>
-              )}
-            </>
+          {activeTab === 'search' && (
+            <div className="p-4 sm:p-6 max-w-7xl w-full mx-auto">
+              <div className="mb-5">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">Search Properties</h1>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Set your filters and click Search to view results</p>
+              </div>
+              <PropertyFilters
+                filters={filters}
+                setFilters={setFilters}
+                resultCount={null}
+                onSearch={handleSearch}
+              />
+            </div>
+          )}
+          {activeTab === 'connect' && (
+            subInfo.isExpired 
+              ? <ExpiredSubscriptionOverlay user={user} subInfo={subInfo} />
+              : <QRConnect />
+          )}
+          {activeTab === 'scrapedChats' && (
+            subInfo.isExpired
+              ? <ExpiredSubscriptionOverlay user={user} subInfo={subInfo} />
+              : <ScrapedChats setToast={setToast} />
+          )}
+          {activeTab === 'resetPassword' && <ResetPassword setToast={setToast} />}
+          {activeTab === 'saved' && (
+            <div className="p-6 text-center mt-16">
+              <svg className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              <p className="font-bold text-slate-600 dark:text-slate-350">No saved listings yet</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Click the heart icon on any property to save it</p>
+            </div>
           )}
         </main>
       </div>

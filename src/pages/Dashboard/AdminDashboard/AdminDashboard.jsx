@@ -1033,15 +1033,6 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
     fetchUsers()
   }, [])
 
-  // Trigger loading skeleton on tab change
-  useEffect(() => {
-    setTabLoading(true)
-    const timer = setTimeout(() => {
-      setTabLoading(false)
-    }, 600)
-    return () => clearTimeout(timer)
-  }, [activeTab])
-
   return (
     <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 overflow-hidden transition-colors">
       <Sidebar
@@ -1063,16 +1054,10 @@ const AdminDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
           user={user}
         />
         <main className="flex-1 overflow-y-auto">
-          {tabLoading ? (
-            <SkeletonLoading tab={activeTab} />
-          ) : (
-            <>
-              {activeTab === 'overview' && <AdminOverview users={users} theme={theme} setActiveTab={setActiveTab} />}
-              {activeTab === 'connect' && <QRConnect />}
-              {activeTab === 'users' && <AdminUsersPanel users={users} setActiveTab={setActiveTab} onRenewSubscription={handleRenewSubscription} />}
-              {activeTab === 'createUser' && <AdminCreateUserPanel setToast={setToast} onUserCreated={fetchUsers} />}
-            </>
-          )}
+          {activeTab === 'overview' && <AdminOverview users={users} theme={theme} setActiveTab={setActiveTab} />}
+          {activeTab === 'connect' && <QRConnect />}
+          {activeTab === 'users' && <AdminUsersPanel users={users} setActiveTab={setActiveTab} onRenewSubscription={handleRenewSubscription} />}
+          {activeTab === 'createUser' && <AdminCreateUserPanel setToast={setToast} onUserCreated={fetchUsers} />}
         </main>
       </div>
     </div>
