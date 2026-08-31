@@ -1,12 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { io } from 'socket.io-client'
-import { API_ENDPOINTS, qrApi, getLoggedInUserId } from '../../api'
+import { qrApi, getLoggedInUserId } from '../../api'
 
-const API_URL = API_ENDPOINTS.qrLatest
-const STATUS_API_URL = API_ENDPOINTS.qrConnectionStatus
 const SOCKET_BASE_URL = import.meta.env.VITE_SCRAPPER_URL || 'https://scrapper-node-app.onrender.com'
-const POLL_INTERVAL = 5000 // 5 seconds interval fallback
 
 const STATUS = {
   LOADING: 'loading',
@@ -72,36 +69,32 @@ const QRConnect = () => {
     }
 
     const userId = getLoggedInUserId()
-    const queryParams = new URLSearchParams({ t: Date.now() })
-    if (userId) queryParams.append('userId', userId)
-    const cacheBustUrl = `${API_URL}?${queryParams.toString()}`
+    const prefetchedBootstrap = !silent && isInitialFetch.current
+      ? qrApi.consumePrefetchedBootstrap(userId)
+      : null
+    const preserveCurrentDisplay = (previousStatus) => (
+      previousStatus === STATUS.CONNECTED || (previousStatus === STATUS.READY && qrData)
+        ? previousStatus
+        : STATUS.LOADING
+    )
 
     // 🚀 Parallel check: Connection status + QR Code simultaneously
-    const [connectionResult, qrResult] = await Promise.allSettled([
-      (async () => {
-        try {
-          setCheckingStatus(true)
-          const res = await qrApi.getConnectionStatus()
-          const data = res?.data || res
-          setConnectionDetails(data)
-          setCheckingStatus(false)
-          return data
-        } catch (err) {
-          setCheckingStatus(false)
-          return null
-        }
-      })(),
-      fetch(cacheBustUrl, {
-        headers: {
-          'bypass-tunnel-reminder': 'true',
-          'Pragma': 'no-cache',
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        }
-      }).then(res => res.json().then(json => ({ status: res.status, ok: res.ok, json })).catch(() => ({ status: res.status, ok: res.ok, json: null })))
-    ])
+    setCheckingStatus(true)
+    const [connectionResult, qrResult] = prefetchedBootstrap
+      ? await Promise.all([
+          prefetchedBootstrap.connectionResult,
+          prefetchedBootstrap.qrResult,
+        ])
+      : await Promise.allSettled([
+          qrApi.getConnectionStatus(),
+          qrApi.getLatestQRResponse({ userId }),
+        ])
+    setCheckingStatus(false)
 
     // Process connection status first
-    const connData = connectionResult.status === 'fulfilled' ? connectionResult.value : null
+    const connPayload = connectionResult.status === 'fulfilled' ? connectionResult.value : null
+    const connData = connPayload?.data || connPayload
+    if (connData) setConnectionDetails(connData)
     if (connData?.linked === true || connData?.status === 'connected' || connData?.status === 'authenticated') {
       setStatus(STATUS.CONNECTED)
       setQrData(null)
@@ -122,12 +115,14 @@ const QRConnect = () => {
       const hasQrUrl = !!(rawDataCheck?.url || rawDataCheck?.qr || json?.url || json?.qr)
 
       if (resStatus === 404 || json?.message === 'No fresh QR URL found') {
-        setStatus(prev => (prev === STATUS.CONNECTED ? prev : STATUS.LOADING))
+        isInitialFetch.current = false
+        setStatus(preserveCurrentDisplay)
         return
       }
 
       if (json?.data?.status === 'waiting' && !hasQrUrl) {
-        setStatus(prev => (prev === STATUS.CONNECTED ? prev : STATUS.LOADING))
+        isInitialFetch.current = false
+        setStatus(preserveCurrentDisplay)
         return
       }
 
@@ -137,7 +132,8 @@ const QRConnect = () => {
       const qrCode = rawData?.url || rawData?.qr || json?.url || json?.qr || '';
 
       if (!qrCode) {
-        setStatus(prev => (prev === STATUS.CONNECTED ? prev : STATUS.LOADING))
+        isInitialFetch.current = false
+        setStatus(preserveCurrentDisplay)
         return
       }
 
@@ -235,14 +231,28 @@ const QRConnect = () => {
 
   // ⚡ Adaptive fast polling: Every 1.2s when waiting for QR, 6s when already displayed
   useEffect(() => {
-    fetchQR(false)
-
+    let cancelled = false
+    let timer
     const pollSpeed = status === STATUS.LOADING ? 1200 : 6000
-    const interval = setInterval(() => {
-      fetchQR(true)
-    }, pollSpeed)
 
-    return () => clearInterval(interval)
+    const poll = async () => {
+      try {
+        await fetchQR(!isInitialFetch.current)
+      } finally {
+        if (!cancelled) timer = setTimeout(poll, pollSpeed)
+      }
+    }
+
+    if (isInitialFetch.current) {
+      poll()
+    } else {
+      timer = setTimeout(poll, pollSpeed)
+    }
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [fetchQR, status])
 
   // Update relative time readout every 5 seconds

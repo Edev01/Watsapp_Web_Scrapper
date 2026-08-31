@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { API_ENDPOINTS } from '../../api'
+import { API_ENDPOINTS, qrApi } from '../../api'
 
 const SignIn = ({ setAuthUser, setToast }) => {
   const navigate = useNavigate()
@@ -88,6 +88,11 @@ const SignIn = ({ setAuthUser, setToast }) => {
           // Always reset active tab on fresh login so Admin lands on Overview
           localStorage.setItem('admin_active_tab', 'overview');
           localStorage.setItem('user_active_tab', 'search');
+
+          // Start generating/fetching the user's QR before the dashboard renders.
+          if (role !== 'admin' && id) {
+            qrApi.prefetchBootstrap({ userId: id, token, force: true })
+          }
 
           setAuthUser(loggedInUser);
           setToast({ type: 'success', message: `Welcome back, ${fullName}!` });

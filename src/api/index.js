@@ -16,8 +16,8 @@ export const API_ENDPOINTS = {
   normalizeStatus: `${BASE_URL}/api/normalize/status`,
 };
 
-const buildHeaders = () => {
-  const token = localStorage.getItem('authToken')
+const buildHeaders = (tokenOverride = '') => {
+  const token = tokenOverride || localStorage.getItem('authToken')
   const headers = {
     'Content-Type': 'application/json',
     'bypass-tunnel-reminder': 'true',
@@ -61,6 +61,35 @@ export const getLoggedInUserId = () => {
   return null
 }
 
+const QR_BOOTSTRAP_TTL_MS = 45000
+let qrBootstrapCache = null
+
+const settleRequest = (promise) => promise.then(
+  value => ({ status: 'fulfilled', value }),
+  reason => ({ status: 'rejected', reason })
+)
+
+const getQrUrl = (endpoint, userId, cacheBust = false) => {
+  const params = new URLSearchParams()
+  if (userId) params.set('userId', userId)
+  if (cacheBust) params.set('t', Date.now())
+  const query = params.toString()
+  return query ? `${endpoint}?${query}` : endpoint
+}
+
+const fetchLatestQRResponse = async (userId, token = '') => {
+  const response = await fetch(getQrUrl(API_ENDPOINTS.qrLatest, userId, true), {
+    headers: {
+      ...buildHeaders(token),
+      'Pragma': 'no-cache',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    },
+  })
+
+  const json = await response.json().catch(() => null)
+  return { status: response.status, ok: response.ok, json }
+}
+
 export const qrApi = {
   getLatestQR: () => {
     const userId = getLoggedInUserId()
@@ -71,6 +100,39 @@ export const qrApi = {
     const userId = getLoggedInUserId()
     const url = userId ? `${API_ENDPOINTS.qrConnectionStatus}?userId=${userId}` : API_ENDPOINTS.qrConnectionStatus
     return apiRequest(url)
+  },
+  getLatestQRResponse: ({ userId = getLoggedInUserId(), token = '' } = {}) => (
+    fetchLatestQRResponse(userId, token)
+  ),
+  prefetchBootstrap: ({ userId = getLoggedInUserId(), token = '', force = false } = {}) => {
+    if (!userId) return null
+
+    const cacheKey = String(userId)
+    const isFresh = qrBootstrapCache &&
+      qrBootstrapCache.userId === cacheKey &&
+      Date.now() - qrBootstrapCache.startedAt < QR_BOOTSTRAP_TTL_MS
+
+    if (!force && isFresh) return qrBootstrapCache
+
+    const statusUrl = getQrUrl(API_ENDPOINTS.qrConnectionStatus, userId)
+    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+
+    qrBootstrapCache = {
+      userId: cacheKey,
+      startedAt: Date.now(),
+      connectionResult: settleRequest(apiRequest(statusUrl, { headers: authHeaders })),
+      qrResult: settleRequest(fetchLatestQRResponse(userId, token)),
+    }
+
+    return qrBootstrapCache
+  },
+  consumePrefetchedBootstrap: (userId = getLoggedInUserId()) => {
+    if (!userId || !qrBootstrapCache) return null
+    const isFresh = qrBootstrapCache.userId === String(userId) &&
+      Date.now() - qrBootstrapCache.startedAt < QR_BOOTSTRAP_TTL_MS
+    const cachedBootstrap = isFresh ? qrBootstrapCache : null
+    qrBootstrapCache = null
+    return cachedBootstrap
   },
 };
 

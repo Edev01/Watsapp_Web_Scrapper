@@ -4,10 +4,8 @@ import Sidebar from '../../../components/Sidebar/Sidebar'
 import PropertyFilters, { DEFAULT_FILTERS } from '../../../components/PropertyFilters/PropertyFilters'
 import QRConnect from '../../../components/QRConnect/QRConnect'
 import Header from '../../../components/Header/Header'
-import SkeletonLoading from '../../../components/SkeletonLoading/SkeletonLoading'
 import ScrapedChats from '../../../components/ScrapedChats/ScrapedChats'
 import ResetPassword from '../../../components/ResetPassword/ResetPassword'
-import { API_ENDPOINTS } from '../../../api'
 
 const ExpiredSubscriptionOverlay = ({ user, subInfo }) => (
   <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
@@ -73,7 +71,7 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
       try {
         const parsed = JSON.parse(saved)
         return { ...DEFAULT_FILTERS, ...parsed }
-      } catch (e) {
+      } catch {
         return DEFAULT_FILTERS
       }
     }
@@ -86,19 +84,6 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   useEffect(() => {
     localStorage.setItem('property_search_filters', JSON.stringify(filters))
   }, [filters])
-
-  // 🚀 Background Pre-warm WhatsApp QR session as soon as Dashboard opens
-  useEffect(() => {
-    try {
-      const userId = user?.id || user?._id || user?.userId
-      if (userId) {
-        const queryParams = new URLSearchParams({ userId, t: Date.now() })
-        fetch(`${API_ENDPOINTS.qrLatest}?${queryParams.toString()}`, {
-          headers: { 'bypass-tunnel-reminder': 'true' }
-        }).catch(() => {})
-      }
-    } catch (e) {}
-  }, [user])
 
   const handleSearch = (appliedFilters) => {
     navigate('/results', { state: { filters: appliedFilters } })
@@ -168,10 +153,13 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
               />
             </div>
           )}
-          {activeTab === 'connect' && (
-            subInfo.isExpired 
-              ? <ExpiredSubscriptionOverlay user={user} subInfo={subInfo} />
-              : <QRConnect />
+          {!subInfo.isExpired && (
+            <section hidden={activeTab !== 'connect'} aria-label="WhatsApp connection">
+              <QRConnect />
+            </section>
+          )}
+          {activeTab === 'connect' && subInfo.isExpired && (
+            <ExpiredSubscriptionOverlay user={user} subInfo={subInfo} />
           )}
           {activeTab === 'scrapedChats' && (
             subInfo.isExpired
