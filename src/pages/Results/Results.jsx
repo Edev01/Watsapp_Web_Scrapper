@@ -151,6 +151,102 @@ const parsePropertyPrice = (priceStr, priceVal, rawMessage = '') => {
   return null
 }
 
+const PRICE_UNIT_PATTERN = 'crores|crore|cror|cr|lakh|lakhs|lacs|lac|thousand|hazar|k|c|l'
+
+const convertPriceAmount = (amount, unit = '') => {
+  const value = parseFloat(amount)
+  if (!Number.isFinite(value) || value <= 0) return null
+
+  const normalizedUnit = unit.toLowerCase()
+  if (['crores', 'crore', 'cror', 'cr', 'c'].includes(normalizedUnit)) {
+    return Math.round(value * 10000000)
+  }
+  if (['lakh', 'lakhs', 'lacs', 'lac', 'l'].includes(normalizedUnit)) {
+    return Math.round(value * 100000)
+  }
+  if (['thousand', 'hazar', 'k'].includes(normalizedUnit)) {
+    return Math.round(value * 1000)
+  }
+
+  if (value >= 1000) return value
+  if (value < 10) return Math.round(value * 10000000)
+  return Math.round(value * 100000)
+}
+
+const parsePriceSearch = (input = '') => {
+  const text = input.toLowerCase().replace(/,/g, '').replace(/[–—]/g, '-').trim()
+  if (!text) return null
+
+  const rangeRegex = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(${PRICE_UNIT_PATTERN})?\\s*(?:-|to|se)\\s*(\\d+(?:\\.\\d+)?)\\s*(${PRICE_UNIT_PATTERN})?`, 'i')
+  const rangeMatch = text.match(rangeRegex)
+
+  if (rangeMatch) {
+    const unit = rangeMatch[2] || rangeMatch[4] || ''
+    const min = convertPriceAmount(rangeMatch[1], unit)
+    const max = convertPriceAmount(rangeMatch[3], rangeMatch[4] || unit)
+
+    if (min && max) {
+      return {
+        type: 'range',
+        min: Math.min(min, max),
+        max: Math.max(min, max),
+      }
+    }
+  }
+
+  const amountRegex = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(${PRICE_UNIT_PATTERN})?`, 'i')
+  const amountMatch = text.match(amountRegex)
+  if (!amountMatch) return null
+
+  const amount = convertPriceAmount(amountMatch[1], amountMatch[2] || '')
+  if (!amount) return null
+
+  const hasMaxIntent = /(^|\b)(under|below|less than|upto|up to|max|maximum|within|budget|tak|andar|kam)(\b|$)|<=|</i.test(text)
+  const hasMinIntent = /(^|\b)(above|over|more than|greater than|min|minimum|from|zyada)(\b|$)|>=|>/i.test(text)
+
+  if (hasMaxIntent) {
+    return { type: 'max', min: null, max: amount }
+  }
+
+  if (hasMinIntent) {
+    return { type: 'min', min: amount, max: null }
+  }
+
+  const tolerance = Math.max(amount * 0.05, amount >= 100000 ? 100000 : 5000)
+  return {
+    type: 'exact',
+    min: Math.max(0, amount - tolerance),
+    max: amount + tolerance,
+    exact: amount,
+  }
+}
+
+const getPropertyPriceBounds = (property) => {
+  const formatted = String(property.priceFormatted || '').toLowerCase().replace(/,/g, '').replace(/[–—]/g, '-')
+  const rangeRegex = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(${PRICE_UNIT_PATTERN})?\\s*(?:-|to|se)\\s*(\\d+(?:\\.\\d+)?)\\s*(${PRICE_UNIT_PATTERN})?`, 'i')
+  const rangeMatch = formatted.match(rangeRegex)
+
+  if (rangeMatch) {
+    const unit = rangeMatch[2] || rangeMatch[4] || ''
+    const min = convertPriceAmount(rangeMatch[1], unit)
+    const max = convertPriceAmount(rangeMatch[3], rangeMatch[4] || unit)
+
+    if (min && max) {
+      return {
+        min: Math.min(min, max),
+        max: Math.max(min, max),
+      }
+    }
+  }
+
+  if (property.price !== null && property.price !== undefined && !isNaN(property.price) && property.price > 0) {
+    return { min: property.price, max: property.price }
+  }
+
+  const parsed = parsePropertyPrice(property.priceFormatted, property.price, property.description)
+  return parsed ? { min: parsed, max: parsed } : null
+}
+
 // 🔄 Map ML API response item to normalized property object
 const normalizeMLResult = (item, index) => {
   const purposeMap = { SALE: 'Buy', RENT: 'Rent', BUY: 'Buy' }
@@ -811,6 +907,7 @@ const Results = () => {
   const [results, setResults] = useState([])
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('') // Live search query state
+  const [priceSearchTerm, setPriceSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1) // Pagination state
   const [selectedProperty, setSelectedProperty] = useState(null) // Drawer state
 
@@ -893,7 +990,7 @@ const Results = () => {
   // Reset to page 1 on live search change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm])
+  }, [searchTerm, priceSearchTerm])
 
   // 🔍 Real-time Live Filter on Results
   const filteredResults = useMemo(() => {
@@ -966,8 +1063,37 @@ const Results = () => {
       })
     }
 
+    // 7. Dedicated numeric price search beside the live search bar
+    if (priceSearchTerm.trim()) {
+      const priceQuery = priceSearchTerm.trim().toLowerCase()
+      const parsedPriceSearch = parsePriceSearch(priceQuery)
+
+      list = list.filter(p => {
+        const textMatch = [
+          p.priceFormatted,
+          formatPrice(p.price, p.purpose, p.priceFormatted),
+        ].filter(Boolean).some(value => String(value).toLowerCase().includes(priceQuery))
+
+        if (textMatch) return true
+        if (!parsedPriceSearch) return false
+
+        const bounds = getPropertyPriceBounds(p)
+        if (!bounds) return false
+
+        if (parsedPriceSearch.type === 'max') {
+          return bounds.min <= parsedPriceSearch.max
+        }
+
+        if (parsedPriceSearch.type === 'min') {
+          return bounds.max >= parsedPriceSearch.min
+        }
+
+        return bounds.max >= parsedPriceSearch.min && bounds.min <= parsedPriceSearch.max
+      })
+    }
+
     return list
-  }, [results, committed.purpose, committed.propertyType, committed.propertySubType, committed.priceMin, committed.priceMax, committed.areaMin, committed.areaMax, committed.areaUnit, searchTerm])
+  }, [results, committed.purpose, committed.propertyType, committed.propertySubType, committed.priceMin, committed.priceMax, committed.areaMin, committed.areaMax, committed.areaUnit, searchTerm, priceSearchTerm])
 
   // 📄 Pagination Calculations (20 items per page)
   const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE) || 1
@@ -1186,7 +1312,7 @@ const Results = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           
           {/* 🔍 Interactive Live Search Input Bar */}
-          <div className="flex items-center gap-3 flex-1">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 flex-1">
             <div className="relative w-full sm:max-w-md">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1197,7 +1323,7 @@ const Results = () => {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Live search by location, property, phone, price..."
+                placeholder="Live search by location, property, phone..."
                 className="w-full pl-10 pr-9 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-colors shadow-sm"
               />
               {searchTerm && (
@@ -1214,9 +1340,36 @@ const Results = () => {
               )}
             </div>
 
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap hidden md:inline">
+            <div className="relative w-full sm:max-w-xs">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-emerald-500 dark:text-emerald-400">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m3-9.5A3.5 3.5 0 0011.5 5H10a3 3 0 000 6h4a3 3 0 010 6h-1.5A3.5 3.5 0 019 13.5" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={priceSearchTerm}
+                onChange={(e) => setPriceSearchTerm(e.target.value)}
+                placeholder="Price: 1.5 cr, 80 lac, < 2 cr..."
+                className="w-full pl-10 pr-9 py-2.5 text-xs rounded-xl border border-emerald-200 dark:border-emerald-900/70 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-colors shadow-sm"
+              />
+              {priceSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setPriceSearchTerm('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  aria-label="Clear price search"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap hidden xl:inline">
               {filteredResults.length} {filteredResults.length === 1 ? 'property' : 'properties'}
-              {searchTerm && ` (filtered from ${results.length})`}
+              {(searchTerm || priceSearchTerm) && ` (filtered from ${results.length})`}
             </span>
           </div>
 
@@ -1277,15 +1430,18 @@ const Results = () => {
               🔍
             </div>
             <p className="font-extrabold text-slate-800 dark:text-slate-100 text-lg">
-              {searchTerm ? 'No matching properties found' : 'No properties found for your filters'}
+              {searchTerm || priceSearchTerm ? 'No matching properties found' : 'No properties found for your filters'}
             </p>
             <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-              {searchTerm ? 'Try clearing your live search or searching another keyword' : 'Try adjusting your filters and search again'}
+              {searchTerm || priceSearchTerm ? 'Try clearing your live search or price search' : 'Try adjusting your filters and search again'}
             </p>
-            {searchTerm && (
+            {(searchTerm || priceSearchTerm) && (
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
+                onClick={() => {
+                  setSearchTerm('')
+                  setPriceSearchTerm('')
+                }}
                 className="mt-4 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer"
               >
                 Clear Search
