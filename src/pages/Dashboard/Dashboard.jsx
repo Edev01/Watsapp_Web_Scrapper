@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import AdminDashboard from './AdminDashboard/AdminDashboard'
 import UserDashboard from './UserDashboard/UserDashboard'
 
-const Dashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
+const Dashboard = ({ user, onUserUpdate, onSignOut, setToast, theme, setTheme }) => {
   const navigate = useNavigate()
 
   const handleSignOut = () => {
@@ -28,6 +28,7 @@ const Dashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   return (
     <UserDashboard 
       user={user} 
+      onUserUpdate={onUserUpdate}
       onSignOut={handleSignOut} 
       setToast={setToast} 
       theme={theme} 

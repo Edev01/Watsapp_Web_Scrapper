@@ -59,12 +59,66 @@ const USER_NAV = [
   { id: 'resetPassword', label: 'Reset Password', icon: 'key' },
 ]
 
-const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
+const isFirstLoginUser = (user) => (
+  user?.is_first_login === true ||
+  user?.is_first_login === 1 ||
+  user?.is_first_login === '1' ||
+  user?.is_first_login === 'true' ||
+  user?.isFirstLogin === true
+)
+
+const FirstLoginPasswordModal = ({ onChangePassword, onDismiss }) => (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="first-login-title"
+    aria-describedby="first-login-description"
+  >
+    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:p-7">
+      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 11-4 0 2 2 0 014 0zm4 2a7 7 0 11-13.95 1M15 14l2 2 4-4" />
+        </svg>
+      </div>
+
+      <h2 id="first-login-title" className="text-xl font-black text-slate-900 dark:text-white">
+        Change Your Temporary Password
+      </h2>
+      <p id="first-login-description" className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+        This is your first login. For account security, open Reset Password, enter your current password, and set a new password.
+      </p>
+
+      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+        >
+          Remind Me Later
+        </button>
+        <button
+          type="button"
+          onClick={onChangePassword}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-600"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          Change Password
+        </button>
+      </div>
+    </div>
+  </div>
+)
+
+const UserDashboard = ({ user, onUserUpdate, onSignOut, setToast, theme, setTheme }) => {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('user_active_tab') || 'search'
   })
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showFirstLoginPrompt, setShowFirstLoginPrompt] = useState(() => isFirstLoginUser(user))
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem('property_search_filters')
     if (saved) {
@@ -84,6 +138,27 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
   useEffect(() => {
     localStorage.setItem('property_search_filters', JSON.stringify(filters))
   }, [filters])
+
+  useEffect(() => {
+    if (isFirstLoginUser(user)) {
+      setShowFirstLoginPrompt(true)
+    }
+  }, [user])
+
+  const openPasswordReset = () => {
+    setActiveTab('resetPassword')
+    setSidebarOpen(false)
+    setShowFirstLoginPrompt(false)
+  }
+
+  const handlePasswordChanged = () => {
+    setShowFirstLoginPrompt(false)
+    onUserUpdate?.((currentUser) => currentUser ? {
+      ...currentUser,
+      is_first_login: false,
+      isFirstLogin: false
+    } : currentUser)
+  }
 
   const handleSearch = (appliedFilters) => {
     navigate('/results', { state: { filters: appliedFilters } })
@@ -166,7 +241,13 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
               ? <ExpiredSubscriptionOverlay user={user} subInfo={subInfo} />
               : <ScrapedChats setToast={setToast} />
           )}
-          {activeTab === 'resetPassword' && <ResetPassword setToast={setToast} />}
+          {activeTab === 'resetPassword' && (
+            <ResetPassword
+              userEmail={user?.email}
+              setToast={setToast}
+              onPasswordChanged={handlePasswordChanged}
+            />
+          )}
           {activeTab === 'saved' && (
             <div className="p-6 text-center mt-16">
               <svg className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -178,6 +259,12 @@ const UserDashboard = ({ user, onSignOut, setToast, theme, setTheme }) => {
           )}
         </main>
       </div>
+      {showFirstLoginPrompt && (
+        <FirstLoginPasswordModal
+          onChangePassword={openPasswordReset}
+          onDismiss={() => setShowFirstLoginPrompt(false)}
+        />
+      )}
     </div>
   )
 }

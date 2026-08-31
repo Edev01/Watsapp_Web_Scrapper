@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { API_ENDPOINTS, qrApi } from '../../api'
 
+const isTrueFlag = (value) => value === true || value === 1 || value === '1' || value === 'true'
+
 const SignIn = ({ setAuthUser, setToast }) => {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
@@ -76,13 +78,20 @@ const SignIn = ({ setAuthUser, setToast }) => {
           const role = userObj.role || (email.toLowerCase().includes('admin') ? 'admin' : 'user');
           const fullName = userObj.fullName || userObj.name || (role === 'admin' ? 'Admin User' : 'Standard User');
           const id = userObj.id || userObj._id || userObj.userId || '';
+          const isFirstLogin = isTrueFlag(
+            userObj.is_first_login ??
+            userObj.isFirstLogin ??
+            resJson.is_first_login ??
+            resJson.data?.is_first_login
+          );
 
           const loggedInUser = {
             id,
             fullName,
             email,
             role,
-            token
+            token,
+            is_first_login: isFirstLogin
           };
 
           // Always reset active tab on fresh login so Admin lands on Overview
@@ -110,6 +119,7 @@ const SignIn = ({ setAuthUser, setToast }) => {
               role: foundLocal.role || 'user',
               subscriptionEndDate: foundLocal.subscriptionEndDate,
               subscriptionStatus: foundLocal.subscriptionStatus,
+              is_first_login: isTrueFlag(foundLocal.is_first_login ?? foundLocal.isFirstLogin),
               token: 'demo-local-token'
             }
             localStorage.setItem('authToken', 'demo-local-token')
@@ -138,6 +148,7 @@ const SignIn = ({ setAuthUser, setToast }) => {
             role: foundLocal.role || 'user',
             subscriptionEndDate: foundLocal.subscriptionEndDate,
             subscriptionStatus: foundLocal.subscriptionStatus,
+            is_first_login: isTrueFlag(foundLocal.is_first_login ?? foundLocal.isFirstLogin),
             token: 'demo-local-token'
           }
           localStorage.setItem('authToken', 'demo-local-token')

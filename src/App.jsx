@@ -65,7 +65,7 @@ function AppContent({ toast, setToast, theme, setTheme, authUser, setAuthUser, h
             path="/dashboard"
             element={
               authUser
-                ? <Dashboard user={authUser} onSignOut={handleSignOut} setToast={setToast} theme={theme} setTheme={setTheme} />
+                ? <Dashboard user={authUser} onUserUpdate={setAuthUser} onSignOut={handleSignOut} setToast={setToast} theme={theme} setTheme={setTheme} />
                 : <Navigate to="/signin" replace />
             }
           />
