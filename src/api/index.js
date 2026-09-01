@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   scrapedChatsMonitored: `${BASE_URL}/api/scraped-chats/monitored`,
   scrapedChatsDelete: `${BASE_URL}/api/scraped-chats/delete`,
   filterProperties: `${BASE_URL}/api/properties/filter`,
+  propertyStatuses: `${BASE_URL}/api/properties/statuses`,
   normalizeStatus: `${BASE_URL}/api/normalize/status`,
 };
 
@@ -216,11 +217,16 @@ export const scrapedChatsApi = {
 };
 
 export const propertyApi = {
+  getStatuses: () => apiRequest(API_ENDPOINTS.propertyStatuses),
   filterProperties: (filters) => {
     const userId = getLoggedInUserId()
+    const normalizedFilters = {
+      ...filters,
+      ...(filters?.status ? { status: String(filters.status).toUpperCase() } : {}),
+    }
     return apiRequest(API_ENDPOINTS.filterProperties, {
       method: 'POST',
-      body: JSON.stringify({ filters, ...(userId ? { userId } : {}) }),
+      body: JSON.stringify({ filters: normalizedFilters, ...(userId ? { userId } : {}) }),
     })
   },
 };
@@ -268,6 +274,7 @@ export const mlSearchApi = {
 
     if (filters.purpose && filters.purpose !== 'All') payload.purpose = filters.purpose
     if (filters.city && filters.city !== 'All Cities') payload.city = filters.city
+    if (filters.status) payload.status = String(filters.status).toUpperCase()
     
     // Pass user input to ML AI 'query' field so normalization and typo-tolerance work
     const searchParam = (filters.query || filters.location || '').trim()

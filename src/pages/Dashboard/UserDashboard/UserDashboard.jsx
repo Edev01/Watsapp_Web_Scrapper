@@ -215,11 +215,7 @@ const UserDashboard = ({ user, onUserUpdate, onSignOut, setToast, theme, setThem
         />
         <main className="flex-1 overflow-y-auto">
           {activeTab === 'search' && (
-            <div className="p-4 sm:p-6 max-w-7xl w-full mx-auto">
-              <div className="mb-5">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">Search Properties</h1>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Set your filters and click Search to view results</p>
-              </div>
+            <div className="mx-auto w-full max-w-[1600px] p-4 sm:p-6">
               <PropertyFilters
                 filters={filters}
                 setFilters={setFilters}
