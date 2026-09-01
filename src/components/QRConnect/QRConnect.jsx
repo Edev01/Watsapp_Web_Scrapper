@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { io } from 'socket.io-client'
-import { qrApi, getLoggedInUserId } from '../../api'
+import { qrApi, getLoggedInUserId, isWhatsAppConnected } from '../../api'
 
 const SOCKET_BASE_URL = import.meta.env.VITE_SCRAPPER_URL || 'https://scrapper-node-app.onrender.com'
 
@@ -26,17 +26,85 @@ const formatRelativeTime = (dateStr) => {
   return date.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' })
 }
 
-const QRConnect = () => {
-  const [status, setStatus] = useState(STATUS.LOADING)
-  const [qrData, setQrData] = useState(null)
-  const [qrMeta, setQrMeta] = useState(null) // { createdAt, pageUrl, source }
-  const [connectionDetails, setConnectionDetails] = useState(null) // { linked, boundPhone, whatsappJid, status, message }
+const mapReadyStateToStatus = (ready) => {
+  if (!ready) return STATUS.LOADING
+  if (ready.connected || ready.displayStatus === 'connected') return STATUS.CONNECTED
+  if (ready.qrCode || ready.displayStatus === 'ready') return STATUS.READY
+  return STATUS.LOADING
+}
+
+const getInitialQrState = () => {
+  const ready = qrApi.getReadyState(getLoggedInUserId())
+  return {
+    ready,
+    status: mapReadyStateToStatus(ready),
+    qrData: ready?.qrCode || null,
+    qrMeta: ready?.qrMeta || null,
+    connectionDetails: ready?.connectionDetails || null,
+  }
+}
+
+const QRConnect = ({ onConnectionChange }) => {
+  const initialState = getInitialQrState()
+  const [status, setStatus] = useState(initialState.status)
+  const [qrData, setQrData] = useState(initialState.qrData)
+  const [qrMeta, setQrMeta] = useState(initialState.qrMeta)
+  const [connectionDetails, setConnectionDetails] = useState(initialState.connectionDetails)
   const [checkingStatus, setCheckingStatus] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [lastUpdatedText, setLastUpdatedText] = useState('')
   const [socketConnected, setSocketConnected] = useState(false)
 
-  const isInitialFetch = useRef(true)
+  const isInitialFetch = useRef(initialState.status === STATUS.LOADING)
+
+  const applyReadyState = useCallback((ready) => {
+    if (!ready) return false
+
+    if (ready.connectionDetails) {
+      setConnectionDetails(ready.connectionDetails)
+    }
+
+    if (ready.connected) {
+      setStatus(STATUS.CONNECTED)
+      setQrData(null)
+      setErrorMsg('')
+      onConnectionChange?.(true)
+      isInitialFetch.current = false
+      return true
+    }
+
+    onConnectionChange?.(false)
+
+    if (ready.qrCode) {
+      setQrData(ready.qrCode)
+      if (ready.qrMeta) {
+        setQrMeta(ready.qrMeta)
+        setLastUpdatedText(formatRelativeTime(ready.qrMeta.createdAt))
+      }
+      setStatus(STATUS.READY)
+      setErrorMsg('')
+      isInitialFetch.current = false
+      return true
+    }
+
+    return false
+  }, [onConnectionChange])
+
+  useEffect(() => {
+    const ready = qrApi.getReadyState(getLoggedInUserId())
+    if (applyReadyState(ready)) return undefined
+
+    let active = true
+    qrApi.warmQrSession({ userId: getLoggedInUserId(), force: false })
+      .then((nextReady) => {
+        if (active) applyReadyState(nextReady)
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [applyReadyState])
 
   // 📡 Check Active WhatsApp Connection Status via GET /api/qr/connection-status?userId=...
   const checkConnectionStatus = useCallback(async () => {
@@ -47,12 +115,14 @@ const QRConnect = () => {
       console.log('Active WhatsApp Connection Status:', data)
       setConnectionDetails(data)
 
-      if (data?.linked === true || data?.status === 'connected' || data?.status === 'authenticated') {
+      if (isWhatsAppConnected(data)) {
         setStatus(STATUS.CONNECTED)
         setQrData(null)
         setErrorMsg('')
+        onConnectionChange?.(true)
         return true
       }
+      onConnectionChange?.(false)
       return false
     } catch (err) {
       console.error('Error fetching connection status:', err.message)
@@ -60,11 +130,16 @@ const QRConnect = () => {
     } finally {
       setCheckingStatus(false)
     }
-  }, [])
+  }, [onConnectionChange])
 
   // 🔄 Fetch latest QR Code for logged-in user (Parallel execution for speed)
   const fetchQR = useCallback(async (silent = false) => {
-    if (!silent && isInitialFetch.current) {
+    const ready = qrApi.getReadyState(getLoggedInUserId())
+    if (!silent && applyReadyState(ready)) {
+      return
+    }
+
+    if (!silent && isInitialFetch.current && !qrData) {
       setStatus(STATUS.LOADING)
     }
 
@@ -95,13 +170,16 @@ const QRConnect = () => {
     const connPayload = connectionResult.status === 'fulfilled' ? connectionResult.value : null
     const connData = connPayload?.data || connPayload
     if (connData) setConnectionDetails(connData)
-    if (connData?.linked === true || connData?.status === 'connected' || connData?.status === 'authenticated') {
+    if (isWhatsAppConnected(connData)) {
       setStatus(STATUS.CONNECTED)
       setQrData(null)
       setErrorMsg('')
+      onConnectionChange?.(true)
       isInitialFetch.current = false
+      qrApi.cacheReadyFromResults(userId, connectionResult, qrResult)
       return
     }
+    onConnectionChange?.(false)
 
     // Process QR result
     try {
@@ -149,6 +227,7 @@ const QRConnect = () => {
       setStatus(STATUS.READY)
       setErrorMsg('')
       isInitialFetch.current = false
+      qrApi.cacheReadyFromResults(userId, connectionResult, qrResult)
     } catch (err) {
       console.error('QR fetch error:', err.message)
       if (isInitialFetch.current && !qrData) {
@@ -158,7 +237,7 @@ const QRConnect = () => {
         }
       }
     }
-  }, [qrData])
+  }, [qrData, onConnectionChange, applyReadyState])
 
   // ⚡ Socket.IO live sync for real-time QR updates & connection events
   useEffect(() => {
@@ -198,15 +277,31 @@ const QRConnect = () => {
         if (qrCode) {
           setQrData(qrCode)
           const createdAt = rawData?.created_at || rawData?.createdAt || new Date().toISOString()
-          setQrMeta({
+          const nextMeta = {
             createdAt,
             pageUrl: rawData?.page_url || rawData?.pageUrl || '',
             source: 'WebSocket Live'
-          })
+          }
+          setQrMeta(nextMeta)
           setLastUpdatedText(formatRelativeTime(createdAt))
           setStatus(STATUS.READY)
           setErrorMsg('')
           isInitialFetch.current = false
+          const userId = getLoggedInUserId()
+          if (userId) {
+            qrApi.cacheReadyFromResults(
+              userId,
+              { status: 'fulfilled', value: connectionDetails },
+              {
+                status: 'fulfilled',
+                value: {
+                  status: 200,
+                  ok: true,
+                  json: { data: { url: qrCode, created_at: createdAt } },
+                },
+              }
+            )
+          }
         }
       })
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { propertyApi } from '../../api'
+import { propertyApi, PROPERTY_STATUS_ENUM } from '../../api'
 
 const CITIES = ['All Cities', 'Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'Faisalabad', 'Multan', 'Peshawar', 'Quetta', 'Hyderabad', 'Sialkot']
 
@@ -12,7 +12,7 @@ const PROPERTY_TYPES = {
 }
 
 const AREA_UNITS = ['All', 'Marla', 'Kanal', 'Sq. Ft.', 'Sq. Yd.']
-const FALLBACK_STATUSES = ['AVAILABLE', 'SOLD', 'RENTED', 'RESERVED', 'WITHDRAWN', 'ON_HOLD']
+const FALLBACK_STATUSES = [...PROPERTY_STATUS_ENUM]
 
 export const formatPriceRangeLabel = (val) => {
   if (!val || val === '0' || val === 0) return '0'

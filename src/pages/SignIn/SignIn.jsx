@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { API_ENDPOINTS, qrApi } from '../../api'
+import { API_ENDPOINTS, qrApi, scrapedChatsApi, isWhatsAppConnected } from '../../api'
 
 const isTrueFlag = (value) => value === true || value === 1 || value === '1' || value === 'true'
 
@@ -84,6 +84,11 @@ const SignIn = ({ setAuthUser, setToast }) => {
             resJson.is_first_login ??
             resJson.data?.is_first_login
           );
+          const whatsappConnected = isWhatsAppConnected({
+            linked: userObj.whatsappConnected ?? userObj.whatsapp_connected ?? resJson.whatsappConnected ?? resJson.data?.whatsappConnected,
+            whatsappConnected: userObj.whatsappConnected ?? userObj.whatsapp_connected ?? resJson.whatsappConnected ?? resJson.data?.whatsappConnected,
+            status: userObj.whatsappStatus ?? userObj.whatsapp_status ?? resJson.whatsappStatus ?? resJson.data?.whatsappStatus,
+          });
 
           const loggedInUser = {
             id,
@@ -91,16 +96,22 @@ const SignIn = ({ setAuthUser, setToast }) => {
             email,
             role,
             token,
-            is_first_login: isFirstLogin
+            is_first_login: isFirstLogin,
+            whatsappConnected,
           };
 
-          // Always reset active tab on fresh login so Admin lands on Overview
+          // Always reset active tab on fresh login so user lands on Scraped Chats
           localStorage.setItem('admin_active_tab', 'overview');
-          localStorage.setItem('user_active_tab', 'search');
+          localStorage.setItem('user_active_tab', role === 'admin' ? 'search' : 'scrapedChats');
 
-          // Start generating/fetching the user's QR before the dashboard renders.
+          // Warm up WhatsApp QR + monitored chats before the dashboard renders.
           if (role !== 'admin' && id) {
-            qrApi.prefetchBootstrap({ userId: id, token, force: true })
+            scrapedChatsApi.prefetchMonitoredChats({ userId: id, token, force: true })
+            scrapedChatsApi.prefetchAllChats({ userId: id, token, force: true })
+            await Promise.race([
+              qrApi.warmQrSession({ userId: id, token, force: true }),
+              new Promise((resolve) => setTimeout(resolve, 5000)),
+            ])
           }
 
           setAuthUser(loggedInUser);

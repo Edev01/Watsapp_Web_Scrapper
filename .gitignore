@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local ML API test script (may contain credentials)
+scripts/test-ml-dashboard-search.mjs

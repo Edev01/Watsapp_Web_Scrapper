@@ -5,7 +5,7 @@ import { DEFAULT_FILTERS, formatPriceRangeLabel } from '../../components/Propert
 import { CardSkeleton } from '../../components/Skeleton/Skeleton'
 import Header from '../../components/Header/Header'
 import Sidebar from '../../components/Sidebar/Sidebar'
-import { mlSearchApi, normalizeApi } from '../../api'
+import { mlSearchApi, normalizeApi, propertyApi, PROPERTY_STATUS_ENUM } from '../../api'
 
 const ITEMS_PER_PAGE = 20
 
@@ -257,6 +257,69 @@ const getPropertyPriceBounds = (property) => {
   return parsed ? { min: parsed, max: parsed } : null
 }
 
+// 🔄 Map backend property filter response to normalized property object
+const normalizeFilterProperty = (item, index) => {
+  const purposeMap = { SALE: 'Buy', RENT: 'Rent', BUY: 'Buy' }
+  const rawPurpose = String(item.purpose || item.transaction_type || '').toUpperCase()
+  const purpose = purposeMap[rawPurpose] || item.purpose || 'Buy'
+
+  const propertyType = String(item.property_type || item.propertyType || item.type || '')
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+
+  const location = [
+    item.area,
+    item.vicinity,
+    item.location,
+    item.area_name,
+    item.areaName,
+  ].filter(Boolean).join(', ')
+
+  const parsedPrice = parsePropertyPrice(
+    item.price || item.price_formatted || item.priceFormatted,
+    item.price_value || item.priceValue || item.price,
+    item.raw_message || item.description || item.message
+  )
+
+  return {
+    id: item.id || item._id || item.message_id || index,
+    title: item.title || item.summary || `${item.size || item.area_size || ''} ${item.propertySubType || item.property_sub_type || propertyType}`.trim() || 'Property Listing',
+    price: parsedPrice ?? item.parsedPricePKR ?? null,
+    priceFormatted: item.price || item.price_formatted || item.priceFormatted || '',
+    area: item.parsedAreaInTargetUnit || item.size_value || item.area_size || item.area || 0,
+    areaUnit: item.targetAreaUnit || item.size_unit || item.area_unit || item.areaUnit || 'Marla',
+    type: propertyType || item.propertyType || 'House',
+    subType: item.propertySubType || item.property_sub_type || '',
+    purpose,
+    city: item.city || '',
+    location: item.location || location || item.city || 'Unknown',
+    areaName: item.area || item.area_name || '',
+    vicinity: item.vicinity || '',
+    currency: 'PKR',
+    phone: item.contactNumber || item.contact_number || item.phone || '',
+    scrapedFrom: 'WhatsApp Property Search',
+    scrapedAt: item.createdAt || item.created_at || new Date().toISOString(),
+    description: item.rawMessage || item.raw_message || item.description || item.message || '',
+    summary: item.summary || '',
+    sentiment: item.sentiment || '',
+    intent: item.intent || '',
+    category: item.category || '',
+    status: item.propertyStatus || item.property_status || item.status || 'AVAILABLE',
+    similarityScore: item.similarity_score,
+  }
+}
+
+// 🔄 Extract listing array from ML dashboard-search response
+const parseMLSearchResults = (response) => {
+  if (!response) return []
+  if (Array.isArray(response.results)) return response.results
+  if (Array.isArray(response?.data?.results)) return response.data.results
+  if (Array.isArray(response.data)) return response.data
+  if (Array.isArray(response.properties)) return response.properties
+  return []
+}
+
 // 🔄 Map ML API response item to normalized property object
 const normalizeMLResult = (item, index) => {
   const purposeMap = { SALE: 'Buy', RENT: 'Rent', BUY: 'Buy' }
@@ -294,6 +357,7 @@ const normalizeMLResult = (item, index) => {
     sentiment: item.sentiment || '',
     intent: item.intent || '',
     category: item.category || '',
+    status: item.property_status || item.propertyStatus || item.status || item.listing_status || item.listingStatus || 'AVAILABLE',
     similarityScore: item.similarity_score,
   }
 }
@@ -340,7 +404,40 @@ const SentimentBadge = ({ sentiment }) => {
   )
 }
 
-// 🗂️ Grid Property Card Component
+const formatListingStatus = (status) => (
+  String(status || 'AVAILABLE')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+)
+
+const listingStatusClass = (status) => {
+  const normalized = String(status || 'AVAILABLE').toUpperCase()
+  const styles = {
+    AVAILABLE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
+    SOLD: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300',
+    RENTED: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+    RESERVED: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300',
+    WITHDRAWN: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+    ON_HOLD: 'bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300',
+  }
+  return styles[normalized] || styles.AVAILABLE
+}
+
+const PropertyStatusSelect = ({ value, options, disabled, onChange }) => (
+  <select
+    value={value || 'AVAILABLE'}
+    disabled={disabled}
+    onClick={(event) => event.stopPropagation()}
+    onChange={(event) => onChange(event.target.value)}
+    aria-label="Update listing status"
+    className={`max-w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-wait disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 ${listingStatusClass(value)}`}
+  >
+    {options.map((status) => (
+      <option key={status} value={status}>{formatListingStatus(status)}</option>
+    ))}
+  </select>
+)
 const PropertyCard = ({ p, onSelect }) => (
   <div
     onClick={() => onSelect(p)}
@@ -443,7 +540,7 @@ const TableSkeleton = () => (
 )
 
 // 📊 Table Component for Row View (table-fixed 100% width, No horizontal scroll!)
-const PropertyTable = ({ properties, onSelect }) => (
+const PropertyTable = ({ properties, onSelect, statusOptions, updatingStatusId, onStatusChange }) => (
   <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
     <table className="w-full table-fixed text-left text-xs text-slate-600 dark:text-slate-300">
       <thead className="bg-slate-50 dark:bg-slate-900/60 text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider border-b border-slate-200 dark:border-slate-700">
@@ -465,21 +562,27 @@ const PropertyTable = ({ properties, onSelect }) => (
             className="hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer group"
           >
             <td className="px-3 py-3.5 text-center font-semibold text-slate-500 dark:text-slate-400">{index + 1}</td>
-            {/* Rent / Sale */}
             <td className="px-3 py-3.5 whitespace-nowrap">
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full inline-block ${p.purpose === 'Buy' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'}`}>
-                For {p.purpose}
-              </span>
+              <PropertyStatusSelect
+                value={p.status || 'AVAILABLE'}
+                options={statusOptions}
+                disabled={updatingStatusId === p.id}
+                onChange={(nextStatus) => onStatusChange(p.id, nextStatus)}
+              />
             </td>
 
-            {/* Property: ONLY Property Type (Line clamped & truncated) */}
             <td className="px-3 py-3.5 overflow-hidden">
-              <span
-                title={p.type || 'Property'}
-                className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors block truncate"
-              >
-                {p.type || 'Property'}
-              </span>
+              <div className="space-y-1">
+                <span
+                  title={p.type || 'Property'}
+                  className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors block truncate"
+                >
+                  {p.type || 'Property'}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${p.purpose === 'Buy' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'}`}>
+                  For {p.purpose}
+                </span>
+              </div>
             </td>
 
             {/* Location: Location and City */}
@@ -636,7 +739,7 @@ const HighlightChip = ({ icon, children }) => (
 )
 
 // 🪟 Ultra-Smooth Framer-Motion Animated Side Drawer (Full Details: Title, Size, SubType, Detailed Area, Full Address)
-const PropertyDrawer = ({ property, onClose }) => {
+const PropertyDrawer = ({ property, onClose, statusOptions, updatingStatusId, onStatusChange }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose()
@@ -685,6 +788,15 @@ const PropertyDrawer = ({ property, onClose }) => {
                     <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${property.purpose === 'Buy' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'}`}>For {property.purpose}</span>
                     <SentimentBadge sentiment={property.sentiment} />
                     {property.category && <span className="rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-bold uppercase text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300">{property.category}</span>}
+                  </div>
+                  <div className="mb-4 flex flex-wrap items-center gap-3">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Listing Status</span>
+                    <PropertyStatusSelect
+                      value={property.status || 'AVAILABLE'}
+                      options={statusOptions}
+                      disabled={updatingStatusId === property.id}
+                      onChange={(nextStatus) => onStatusChange(property.id, nextStatus)}
+                    />
                   </div>
                   <h2 className="text-xl font-black leading-tight text-slate-950 dark:text-white sm:text-2xl">{property.title}</h2>
                   <p className="mt-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
@@ -949,6 +1061,52 @@ const Results = ({ user, onSignOut, theme, setTheme }) => {
   const [normalizeLogs, setNormalizeLogs] = useState([])
   const [showNormalizeModal, setShowNormalizeModal] = useState(false)
   const [normalizationReasons, setNormalizationReasons] = useState([])
+  const [statusOptions, setStatusOptions] = useState(PROPERTY_STATUS_ENUM)
+  const [updatingStatusId, setUpdatingStatusId] = useState(null)
+
+  useEffect(() => {
+    let active = true
+
+    propertyApi.getStatuses()
+      .then((response) => {
+        const statuses = response?.data?.statuses || response?.statuses
+        if (active && Array.isArray(statuses) && statuses.length > 0) {
+          setStatusOptions([...new Set(statuses.map((status) => String(status).trim().toUpperCase()).filter(Boolean))])
+        }
+      })
+      .catch(() => {
+        if (active) setStatusOptions(PROPERTY_STATUS_ENUM)
+      })
+
+    return () => { active = false }
+  }, [])
+
+  const handlePropertyStatusChange = async (propertyId, nextStatus) => {
+    if (!propertyId) return
+
+    const previousStatus = results.find((item) => item.id === propertyId)?.status || 'AVAILABLE'
+    setUpdatingStatusId(propertyId)
+    setResults((prev) => prev.map((item) => (
+      item.id === propertyId ? { ...item, status: nextStatus } : item
+    )))
+    setSelectedProperty((prev) => (
+      prev?.id === propertyId ? { ...prev, status: nextStatus } : prev
+    ))
+
+    try {
+      await propertyApi.updateStatus(propertyId, nextStatus)
+    } catch (err) {
+      setResults((prev) => prev.map((item) => (
+        item.id === propertyId ? { ...item, status: previousStatus } : item
+      )))
+      setSelectedProperty((prev) => (
+        prev?.id === propertyId ? { ...prev, status: previousStatus } : prev
+      ))
+      setError(err.message || 'Failed to update property status')
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }
 
   // 📡 Fetch Normalization Status from /api/normalize/status and analyze reasoning
   const fetchNormalizationStatus = async (currentResults = [], currentFilters = committed) => {
@@ -993,23 +1151,27 @@ const Results = ({ user, onSignOut, theme, setTheme }) => {
     setLoading(true)
     setError('')
     setCurrentPage(1)
-    console.log('🚀 Sending search filters to ML API:', committed)
-    
-    mlSearchApi.dashboardSearch(committed)
-      .then(res => {
-        console.log('ML API Response:', res)
-        let rawList = []
-        if (res?.success && Array.isArray(res.results)) {
-          rawList = res.results
-          setResults(res.results.map(normalizeMLResult))
-        } else {
-          setResults([])
-        }
-        // 🔄 Automatically fetch normalization status and explain why normalization occurred
+    console.log('🚀 Sending search filters to ML dashboard-search:', committed)
+
+    const runSearch = async () => {
+      try {
+        const res = await mlSearchApi.dashboardSearch(committed)
+        const rawList = parseMLSearchResults(res)
+        setResults(rawList.map(normalizeMLResult))
         fetchNormalizationStatus(rawList, committed)
-      })
-      .catch(err => {
-        console.error('ML API Error:', err)
+      } catch (mlError) {
+        console.warn('ML dashboard-search failed, falling back to property filter API:', mlError.message)
+        const res = await propertyApi.filterProperties(committed)
+        const properties = res?.data?.properties || res?.properties || []
+        const normalized = properties.map(normalizeFilterProperty)
+        setResults(normalized)
+        fetchNormalizationStatus(properties, committed)
+      }
+    }
+
+    runSearch()
+      .catch((err) => {
+        console.error('Search API Error:', err)
         setError(err.message || 'Failed to search properties')
         setResults([])
         fetchNormalizationStatus([], committed)
@@ -1024,58 +1186,10 @@ const Results = ({ user, onSignOut, theme, setTheme }) => {
     setCurrentPage(1)
   }, [searchTerm, priceSearchTerm])
 
-  // 🔍 Real-time Live Filter on Results
+  // 🔍 Client-side refine on already-fetched ML results (search bars only)
   const filteredResults = useMemo(() => {
     let list = results
 
-    // 1. Filter by Purpose (Buy / Rent / All)
-    if (committed.purpose && committed.purpose !== 'All') {
-      list = list.filter(p => p.purpose && p.purpose.toLowerCase() === committed.purpose.toLowerCase())
-    }
-
-    // 2. Filter by Property Type (Category)
-    if (committed.propertyType && committed.propertyType !== 'All') {
-      list = list.filter(p => matchesPropertyType(p, committed.propertyType))
-    }
-
-    // 3. Filter by Property Sub Type
-    if (committed.propertySubType && committed.propertySubType !== 'Any') {
-      list = list.filter(p => matchesSubType(p, committed.propertySubType))
-    }
-
-    // 4. Filter by Price Range (Min & Max)
-    const minPrice = committed.priceMin ? parseFloat(committed.priceMin) : null
-    const maxPrice = committed.priceMax ? parseFloat(committed.priceMax) : null
-
-    if (minPrice !== null || maxPrice !== null) {
-      list = list.filter(p => {
-        // If an explicit price filter is active, exclude listings with no price
-        if (p.price === null || p.price === undefined || isNaN(p.price) || p.price <= 0) {
-          return false
-        }
-        if (minPrice !== null && p.price < minPrice) return false
-        if (maxPrice !== null && p.price > maxPrice) return false
-        return true
-      })
-    }
-
-    // 5. Filter by Area Range (Min & Max & Unit)
-    const minArea = committed.areaMin ? parseFloat(committed.areaMin) : null
-    const maxArea = committed.areaMax ? parseFloat(committed.areaMax) : null
-    const filterUnit = committed.areaUnit && committed.areaUnit !== 'All' ? committed.areaUnit.toLowerCase() : null
-
-    if (minArea !== null || maxArea !== null || filterUnit !== null) {
-      list = list.filter(p => {
-        if (filterUnit && (!p.areaUnit || p.areaUnit.toLowerCase() !== filterUnit)) {
-          return false
-        }
-        if (minArea !== null && (!p.area || p.area < minArea)) return false
-        if (maxArea !== null && (!p.area || p.area > maxArea)) return false
-        return true
-      })
-    }
-
-    // 6. Filter by live search bar term
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase()
       list = list.filter(p => {
@@ -1095,7 +1209,6 @@ const Results = ({ user, onSignOut, theme, setTheme }) => {
       })
     }
 
-    // 7. Dedicated numeric price search beside the live search bar
     if (priceSearchTerm.trim()) {
       const priceQuery = priceSearchTerm.trim().toLowerCase()
       const parsedPriceSearch = parsePriceSearch(priceQuery)
@@ -1125,7 +1238,7 @@ const Results = ({ user, onSignOut, theme, setTheme }) => {
     }
 
     return list
-  }, [results, committed.purpose, committed.propertyType, committed.propertySubType, committed.priceMin, committed.priceMax, committed.areaMin, committed.areaMax, committed.areaUnit, searchTerm, priceSearchTerm])
+  }, [results, searchTerm, priceSearchTerm])
 
   // 📄 Pagination Calculations (20 items per page)
   const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE) || 1
@@ -1467,7 +1580,13 @@ const Results = ({ user, onSignOut, theme, setTheme }) => {
           </div>
         ) : viewMode === 'list' ? (
           <>
-            <PropertyTable properties={paginatedResults} onSelect={setSelectedProperty} />
+            <PropertyTable
+              properties={paginatedResults}
+              onSelect={setSelectedProperty}
+              statusOptions={statusOptions}
+              updatingStatusId={updatingStatusId}
+              onStatusChange={handlePropertyStatusChange}
+            />
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -1596,6 +1715,9 @@ const Results = ({ user, onSignOut, theme, setTheme }) => {
       <PropertyDrawer
         property={selectedProperty}
         onClose={() => setSelectedProperty(null)}
+        statusOptions={statusOptions}
+        updatingStatusId={updatingStatusId}
+        onStatusChange={handlePropertyStatusChange}
       />
     </div>
   )

@@ -12,10 +12,24 @@ export const API_ENDPOINTS = {
   scrapedChatsMonitor: `${BASE_URL}/api/scraped-chats/monitor`,
   scrapedChatsMonitored: `${BASE_URL}/api/scraped-chats/monitored`,
   scrapedChatsDelete: `${BASE_URL}/api/scraped-chats/delete`,
+  scrapedChatsStats: `${BASE_URL}/api/scraped-chats/stats`,
   filterProperties: `${BASE_URL}/api/properties/filter`,
   propertyStatuses: `${BASE_URL}/api/properties/statuses`,
   normalizeStatus: `${BASE_URL}/api/normalize/status`,
 };
+
+export const PROPERTY_STATUS_ENUM = [
+  'AVAILABLE',
+  'SOLD',
+  'RENTED',
+  'RESERVED',
+  'WITHDRAWN',
+  'ON_HOLD',
+]
+
+const propertyStatusPatchUrl = (propertyId) => (
+  `${BASE_URL}/api/properties/${encodeURIComponent(propertyId)}/status`
+)
 
 const buildHeaders = (tokenOverride = '') => {
   const token = tokenOverride || localStorage.getItem('authToken')
@@ -63,11 +77,123 @@ export const getLoggedInUserId = () => {
 }
 
 const QR_BOOTSTRAP_TTL_MS = 45000
+const QR_READY_TTL_MS = 5 * 60 * 1000
+const MONITORED_BOOTSTRAP_TTL_MS = 45000
+const CHATS_TAB_CACHE_TTL_MS = 10 * 60 * 1000
+export const CHATS_PAGE_SIZE = 50
 let qrBootstrapCache = null
+let qrReadyCache = null
+let monitoredBootstrapCache = null
+let allChatsTabCache = null
+let monitoredChatsTabCache = null
+let allChatsPrefetch = null
+
+const getChatsCacheUserKey = (userId) => String(userId || '')
+
+const readTabCacheData = (cache, userId) => {
+  if (!cache || cache.userId !== getChatsCacheUserKey(userId)) return []
+  return Array.isArray(cache.data) ? cache.data : []
+}
+
+const readTabCacheMeta = (cache, userId) => {
+  if (!cache || cache.userId !== getChatsCacheUserKey(userId)) {
+    return { data: [], total: 0, page: 1, search: '', hasMore: true }
+  }
+  return {
+    data: Array.isArray(cache.data) ? cache.data : [],
+    total: Number(cache.total) || 0,
+    page: Number(cache.page) || 1,
+    search: cache.search || '',
+    hasMore: cache.hasMore !== false,
+  }
+}
+
+const extractScrapedChatList = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.chats)) return payload.chats
+  if (Array.isArray(payload?.results)) return payload.results
+  if (Array.isArray(payload?.items)) return payload.items
+  if (Array.isArray(payload?.data?.chats)) return payload.data.chats
+  if (Array.isArray(payload?.data?.results)) return payload.data.results
+  if (Array.isArray(payload?.data?.items)) return payload.data.items
+  return []
+}
+
+const normalizeScrapedChat = (chat = {}, { forceMonitored = false } = {}) => ({
+  jid: chat.jid || chat.chatId || chat.id || chat._id || '',
+  name: chat.name || chat.pushName || chat.displayName || chat.title || chat.jid || 'Unknown chat',
+  avatar: chat.avatar || chat.profilePicUrl || chat.picture || chat.image || '',
+  isMonitored: forceMonitored || Boolean(chat.is_monitored ?? chat.isMonitored ?? chat.monitored),
+  createdAt: chat.created_at || chat.createdAt || chat.updated_at || chat.updatedAt || '',
+})
+
+const normalizeScrapedChatList = (payload, options = {}) => (
+  extractScrapedChatList(payload)
+    .map(chat => normalizeScrapedChat(chat, options))
+    .filter(chat => chat.jid)
+)
+
+export const parseChatsPageResponse = (payload) => {
+  const body = payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+    ? payload.data
+    : payload
+
+  const chats = normalizeScrapedChatList(body?.chats ? { data: body.chats } : payload)
+  const total = Number(body?.total ?? payload?.total ?? chats.length)
+  const page = Number(body?.page ?? payload?.page ?? 1)
+  const pageSize = Number(body?.pageSize ?? payload?.pageSize ?? CHATS_PAGE_SIZE)
+  const hasMore = typeof body?.hasMore === 'boolean'
+    ? body.hasMore
+    : typeof payload?.hasMore === 'boolean'
+      ? payload.hasMore
+      : page * pageSize < total
+
+  return { chats, total, page, pageSize, hasMore }
+}
+
+const storeAllChatsTabCache = (userId, data, meta = {}) => {
+  allChatsTabCache = {
+    userId: getChatsCacheUserKey(userId),
+    data: Array.isArray(data) ? data : [],
+    total: Number(meta.total) || 0,
+    page: Number(meta.page) || 1,
+    search: meta.search || '',
+    hasMore: meta.hasMore !== false,
+    updatedAt: Date.now(),
+  }
+}
+
+const storeMonitoredChatsTabCache = (userId, data, meta = {}) => {
+  monitoredChatsTabCache = {
+    userId: getChatsCacheUserKey(userId),
+    data: Array.isArray(data) ? data : [],
+    total: Number(meta.total) || 0,
+    page: Number(meta.page) || 1,
+    search: meta.search || '',
+    hasMore: meta.hasMore !== false,
+    updatedAt: Date.now(),
+  }
+}
 
 const settleRequest = (promise) => promise.then(
   value => ({ status: 'fulfilled', value }),
   reason => ({ status: 'rejected', reason })
+)
+
+export const isWhatsAppConnected = (data) => {
+  if (!data) return false
+  const payload = data?.data || data
+  return payload?.linked === true
+    || payload?.whatsappConnected === true
+    || payload?.status === 'connected'
+    || payload?.status === 'authenticated'
+}
+
+const isFreshCache = (cache, userId, ttlMs) => (
+  cache
+  && cache.userId === String(userId)
+  && Date.now() - cache.startedAt < ttlMs
 )
 
 const getQrUrl = (endpoint, userId, cacheBust = false) => {
@@ -91,6 +217,53 @@ const fetchLatestQRResponse = async (userId, token = '') => {
   return { status: response.status, ok: response.ok, json }
 }
 
+const extractConnectionFromResult = (connectionResult) => {
+  if (connectionResult?.status !== 'fulfilled') return null
+  const connPayload = connectionResult.value
+  return connPayload?.data || connPayload
+}
+
+const extractQrFromResult = (qrResult) => {
+  if (qrResult?.status !== 'fulfilled' || !qrResult.value) return null
+
+  const { status: resStatus, ok: resOk, json } = qrResult.value
+  const rawData = Array.isArray(json?.data) ? json.data[0] : (json?.data || json)
+  const qrCode = rawData?.url || rawData?.qr || json?.url || json?.qr || ''
+
+  if (resStatus === 404 || json?.message === 'No fresh QR URL found') return null
+  if (json?.data?.status === 'waiting' && !qrCode) return null
+  if (!resOk || !qrCode) return null
+
+  return {
+    qrCode,
+    createdAt: rawData?.created_at || rawData?.createdAt || json?.created_at || new Date().toISOString(),
+    pageUrl: rawData?.page_url || rawData?.pageUrl || '',
+    source: rawData?.source || 'API',
+  }
+}
+
+const buildQrReadyState = (userId, connectionResult, qrResult) => {
+  const connectionDetails = extractConnectionFromResult(connectionResult)
+  const connected = isWhatsAppConnected(connectionDetails)
+  const qrPayload = extractQrFromResult(qrResult)
+
+  return {
+    userId: String(userId),
+    updatedAt: Date.now(),
+    connectionDetails,
+    connected,
+    displayStatus: connected ? 'connected' : (qrPayload?.qrCode ? 'ready' : 'loading'),
+    qrCode: qrPayload?.qrCode || null,
+    qrMeta: qrPayload
+      ? {
+          createdAt: qrPayload.createdAt,
+          pageUrl: qrPayload.pageUrl,
+          source: qrPayload.source,
+        }
+      : null,
+  }
+}
+
 export const qrApi = {
   getLatestQR: () => {
     const userId = getLoggedInUserId()
@@ -109,9 +282,7 @@ export const qrApi = {
     if (!userId) return null
 
     const cacheKey = String(userId)
-    const isFresh = qrBootstrapCache &&
-      qrBootstrapCache.userId === cacheKey &&
-      Date.now() - qrBootstrapCache.startedAt < QR_BOOTSTRAP_TTL_MS
+    const isFresh = isFreshCache(qrBootstrapCache, cacheKey, QR_BOOTSTRAP_TTL_MS)
 
     if (!force && isFresh) return qrBootstrapCache
 
@@ -129,11 +300,52 @@ export const qrApi = {
   },
   consumePrefetchedBootstrap: (userId = getLoggedInUserId()) => {
     if (!userId || !qrBootstrapCache) return null
-    const isFresh = qrBootstrapCache.userId === String(userId) &&
-      Date.now() - qrBootstrapCache.startedAt < QR_BOOTSTRAP_TTL_MS
-    const cachedBootstrap = isFresh ? qrBootstrapCache : null
-    qrBootstrapCache = null
-    return cachedBootstrap
+    return isFreshCache(qrBootstrapCache, userId, QR_BOOTSTRAP_TTL_MS)
+      ? qrBootstrapCache
+      : null
+  },
+  getReadyState: (userId = getLoggedInUserId()) => {
+    if (!userId || !qrReadyCache) return null
+    if (qrReadyCache.userId !== String(userId)) return null
+    if (Date.now() - qrReadyCache.updatedAt > QR_READY_TTL_MS) return null
+    return qrReadyCache
+  },
+  warmQrSession: async ({ userId = getLoggedInUserId(), token = '', force = false } = {}) => {
+    if (!userId) return null
+
+    const cacheKey = String(userId)
+    if (!force && qrReadyCache?.userId === cacheKey && Date.now() - qrReadyCache.updatedAt < QR_READY_TTL_MS) {
+      return qrReadyCache
+    }
+
+    const bootstrap = qrApi.prefetchBootstrap({ userId, token, force: force || !isFreshCache(qrBootstrapCache, cacheKey, QR_BOOTSTRAP_TTL_MS) })
+    if (!bootstrap) return qrReadyCache
+
+    const [connectionResult, qrResult] = await Promise.all([
+      bootstrap.connectionResult,
+      bootstrap.qrResult,
+    ])
+
+    qrReadyCache = buildQrReadyState(userId, connectionResult, qrResult)
+    return qrReadyCache
+  },
+  cacheReadyFromResults: (userId, connectionResult, qrResult) => {
+    if (!userId) return null
+    qrReadyCache = buildQrReadyState(userId, connectionResult, qrResult)
+    return qrReadyCache
+  },
+  getPrefetchedConnectionStatus: async (userId = getLoggedInUserId()) => {
+    if (!userId) return null
+
+    if (isFreshCache(qrBootstrapCache, userId, QR_BOOTSTRAP_TTL_MS)) {
+      const connectionResult = await qrBootstrapCache.connectionResult
+      if (connectionResult.status === 'fulfilled') {
+        return connectionResult.value
+      }
+    }
+
+    const statusUrl = getQrUrl(API_ENDPOINTS.qrConnectionStatus, userId)
+    return apiRequest(statusUrl)
   },
 };
 
@@ -142,18 +354,21 @@ export const scrapedChatsApi = {
     const userId = getLoggedInUserId()
     const params = new URLSearchParams()
     
-    // Default pagination & filter parameters
-    params.append('type', options.type || 'chats')
-    params.append('page', options.page ?? 1)
-    params.append('pageSize', options.pageSize ?? 50)
+    params.append('type', options.type || 'all')
+    params.append('page', String(options.page ?? 1))
+    params.append('pageSize', String(options.pageSize ?? CHATS_PAGE_SIZE))
 
     if (userId) {
       params.append('userId', userId)
     }
 
-    // Append any extra query parameters if provided
+    const search = String(options.search || options.q || '').trim()
+    if (search) {
+      params.append('search', search)
+    }
+
     Object.entries(options).forEach(([key, val]) => {
-      if (!['type', 'page', 'pageSize', 'userId'].includes(key) && val !== undefined && val !== null) {
+      if (!['type', 'page', 'pageSize', 'userId', 'search', 'q'].includes(key) && val !== undefined && val !== null) {
         params.append(key, val)
       }
     })
@@ -161,6 +376,14 @@ export const scrapedChatsApi = {
     const url = `${API_ENDPOINTS.scrapedChats}?${params.toString()}`
     return apiRequest(url)
   },
+  getChatStats: () => {
+    const userId = getLoggedInUserId()
+    const url = userId
+      ? `${API_ENDPOINTS.scrapedChatsStats}?userId=${userId}`
+      : API_ENDPOINTS.scrapedChatsStats
+    return apiRequest(url)
+  },
+  parseChatsPage: parseChatsPageResponse,
   getMessages: (chatId) => {
     const userId = getLoggedInUserId()
     const params = new URLSearchParams({ chatId })
@@ -194,6 +417,135 @@ export const scrapedChatsApi = {
     const url = userId ? `${API_ENDPOINTS.scrapedChatsMonitored}?userId=${userId}` : API_ENDPOINTS.scrapedChatsMonitored
     return apiRequest(url)
   },
+  getCachedAllChats: (userId = getLoggedInUserId()) => readTabCacheData(allChatsTabCache, userId),
+  getCachedAllChatsMeta: (userId = getLoggedInUserId()) => readTabCacheMeta(allChatsTabCache, userId),
+  getCachedMonitoredChats: (userId = getLoggedInUserId()) => readTabCacheData(monitoredChatsTabCache, userId),
+  getCachedMonitoredChatsMeta: (userId = getLoggedInUserId()) => readTabCacheMeta(monitoredChatsTabCache, userId),
+  setCachedAllChats: (data, userId = getLoggedInUserId(), meta = {}) => {
+    if (!userId) return
+    storeAllChatsTabCache(userId, data, meta)
+  },
+  setCachedMonitoredChats: (data, userId = getLoggedInUserId(), meta = {}) => {
+    if (!userId) return
+    storeMonitoredChatsTabCache(userId, data, meta)
+  },
+  prefetchAllChats: ({ userId = getLoggedInUserId(), token = '', force = false } = {}) => {
+    if (!userId) return null
+
+    const cacheKey = getChatsCacheUserKey(userId)
+    if (
+      !force
+      && allChatsTabCache?.userId === cacheKey
+      && Date.now() - allChatsTabCache.updatedAt < CHATS_TAB_CACHE_TTL_MS
+    ) {
+      return allChatsPrefetch
+    }
+
+    if (!force && allChatsPrefetch?.userId === cacheKey) {
+      return allChatsPrefetch
+    }
+
+    const params = new URLSearchParams({
+      type: 'all',
+      page: '1',
+      pageSize: String(CHATS_PAGE_SIZE),
+      userId,
+    })
+    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+
+    allChatsPrefetch = {
+      userId: cacheKey,
+      startedAt: Date.now(),
+      result: settleRequest(apiRequest(`${API_ENDPOINTS.scrapedChats}?${params.toString()}`, { headers: authHeaders })),
+    }
+
+    allChatsPrefetch.result.then((settled) => {
+      if (settled.status === 'fulfilled') {
+        const page = parseChatsPageResponse(settled.value)
+        storeAllChatsTabCache(userId, page.chats, page)
+      }
+    })
+
+    return allChatsPrefetch
+  },
+  consumePrefetchedAllChats: async (userId = getLoggedInUserId()) => {
+    const cachedMeta = readTabCacheMeta(allChatsTabCache, userId)
+    if (cachedMeta.data.length > 0) return cachedMeta
+
+    if (!allChatsPrefetch || allChatsPrefetch.userId !== getChatsCacheUserKey(userId)) {
+      return null
+    }
+
+    const settled = await allChatsPrefetch.result
+    if (settled.status === 'fulfilled') {
+      const page = parseChatsPageResponse(settled.value)
+      storeAllChatsTabCache(userId, page.chats, page)
+      return readTabCacheMeta(allChatsTabCache, userId)
+    }
+
+    throw settled.reason
+  },
+  prefetchMonitoredChats: ({ userId = getLoggedInUserId(), token = '', force = false } = {}) => {
+    if (!userId) return null
+
+    const cacheKey = getChatsCacheUserKey(userId)
+    if (
+      !force
+      && monitoredChatsTabCache?.userId === cacheKey
+      && Date.now() - monitoredChatsTabCache.updatedAt < CHATS_TAB_CACHE_TTL_MS
+    ) {
+      return monitoredBootstrapCache
+    }
+
+    if (!force && isFreshCache(monitoredBootstrapCache, cacheKey, MONITORED_BOOTSTRAP_TTL_MS)) {
+      return monitoredBootstrapCache
+    }
+
+    const params = new URLSearchParams({
+      type: 'monitored',
+      page: '1',
+      pageSize: String(CHATS_PAGE_SIZE),
+      userId,
+    })
+    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+
+    monitoredBootstrapCache = {
+      userId: cacheKey,
+      startedAt: Date.now(),
+      monitoredResult: settleRequest(
+        apiRequest(`${API_ENDPOINTS.scrapedChats}?${params.toString()}`, { headers: authHeaders })
+      ),
+    }
+
+    monitoredBootstrapCache.monitoredResult.then((settled) => {
+      if (settled.status === 'fulfilled') {
+        const page = parseChatsPageResponse(settled.value)
+        storeMonitoredChatsTabCache(userId, page.chats.map(chat => ({ ...chat, isMonitored: true })), page)
+      }
+    })
+
+    return monitoredBootstrapCache
+  },
+  consumePrefetchedMonitored: async (userId = getLoggedInUserId()) => {
+    const cachedMeta = readTabCacheMeta(monitoredChatsTabCache, userId)
+    if (cachedMeta.data.length > 0) return cachedMeta
+
+    if (!userId || !monitoredBootstrapCache) return null
+    if (!isFreshCache(monitoredBootstrapCache, userId, MONITORED_BOOTSTRAP_TTL_MS)) {
+      monitoredBootstrapCache = null
+      return null
+    }
+
+    const monitoredResult = await monitoredBootstrapCache.monitoredResult
+    if (monitoredResult.status === 'fulfilled') {
+      const page = parseChatsPageResponse(monitoredResult.value)
+      const chats = page.chats.map(chat => ({ ...chat, isMonitored: true }))
+      storeMonitoredChatsTabCache(userId, chats, page)
+      return readTabCacheMeta(monitoredChatsTabCache, userId)
+    }
+
+    throw monitoredResult.reason
+  },
   deleteChats: (chatIds) => {
     const userId = getLoggedInUserId()
     return apiRequest(API_ENDPOINTS.scrapedChatsDelete, {
@@ -216,17 +568,82 @@ export const scrapedChatsApi = {
   },
 };
 
+const buildPropertyFilterPayload = (filters = {}) => {
+  const payload = {}
+
+  if (filters.status) {
+    payload.status = String(filters.status).toUpperCase()
+  }
+
+  if (filters.purpose && filters.purpose !== 'All') {
+    payload.purpose = filters.purpose
+  }
+
+  if (filters.city && filters.city !== 'All Cities') {
+    payload.city = filters.city
+  }
+
+  const location = (filters.location || filters.query || '').trim()
+  if (location) {
+    payload.location = location
+  }
+
+  if (filters.propertyType && filters.propertyType !== 'All') {
+    payload.propertyType = filters.propertyType
+  }
+
+  if (filters.propertySubType && filters.propertySubType !== 'Any' && filters.propertySubType !== 'Standard') {
+    payload.propertySubType = filters.propertySubType
+  }
+
+  if (filters.priceMin) payload.priceMin = String(filters.priceMin)
+  if (filters.priceMax) payload.priceMax = String(filters.priceMax)
+
+  if (filters.areaUnit && filters.areaUnit !== 'All') {
+    payload.areaUnit = filters.areaUnit
+  }
+
+  if (filters.areaMin) payload.areaMin = String(filters.areaMin)
+  if (filters.areaMax) payload.areaMax = String(filters.areaMax)
+
+  if (filters.sortBy) payload.sortBy = filters.sortBy
+
+  return payload
+}
+
 export const propertyApi = {
   getStatuses: () => apiRequest(API_ENDPOINTS.propertyStatuses),
   filterProperties: (filters) => {
     const userId = getLoggedInUserId()
-    const normalizedFilters = {
-      ...filters,
-      ...(filters?.status ? { status: String(filters.status).toUpperCase() } : {}),
-    }
+    const normalizedFilters = buildPropertyFilterPayload(filters)
+
     return apiRequest(API_ENDPOINTS.filterProperties, {
       method: 'POST',
-      body: JSON.stringify({ filters: normalizedFilters, ...(userId ? { userId } : {}) }),
+      body: JSON.stringify({
+        filters: normalizedFilters,
+        ...(userId ? { userId } : {}),
+      }),
+    })
+  },
+  updateStatus: (propertyId, status) => {
+    const normalizedId = Number(propertyId)
+    if (!normalizedId || Number.isNaN(normalizedId)) {
+      throw new Error('Valid propertyId is required')
+    }
+
+    const normalizedStatus = String(status || '').trim().toUpperCase()
+
+    if (!normalizedStatus) {
+      throw new Error('Property status is required')
+    }
+
+    if (!PROPERTY_STATUS_ENUM.includes(normalizedStatus)) {
+      throw new Error(`Invalid status. Allowed values: ${PROPERTY_STATUS_ENUM.join(', ')}`)
+    }
+
+    return apiRequest(propertyStatusPatchUrl(normalizedId), {
+      method: 'PATCH',
+      body: JSON.stringify({ status: normalizedStatus }),
     })
   },
 };

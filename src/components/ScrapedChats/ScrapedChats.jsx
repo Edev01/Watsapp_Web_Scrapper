@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { API_ENDPOINTS, scrapedChatsApi } from '../../api'
+import { API_ENDPOINTS, scrapedChatsApi, CHATS_PAGE_SIZE } from '../../api'
 
 const extractList = (payload) => {
   if (Array.isArray(payload)) return payload
@@ -277,17 +277,40 @@ const ScrapedChats = ({ setToast }) => {
   // Right-click context menu refs
   const chatListCtxMenuRef = useRef(null)
   const msgCtxMenuRef = useRef(null)
+  const chatFilterRef = useRef('monitored')
+  const allRefreshRef = useRef(null)
+  const monitoredRefreshRef = useRef(null)
+  const appliedSearchRef = useRef('')
+  const searchDebounceRef = useRef(null)
 
-  const [chats, setChats] = useState([])
+  const initialAllMeta = scrapedChatsApi.getCachedAllChatsMeta()
+  const initialMonitoredMeta = scrapedChatsApi.getCachedMonitoredChatsMeta()
+
+  const [allChats, setAllChats] = useState(() => initialAllMeta.data.map(normalizeChat))
+  const [monitoredChats, setMonitoredChats] = useState(() => (
+    initialMonitoredMeta.data.map(chat => ({ ...normalizeChat(chat), isMonitored: true }))
+  ))
   const [messages, setMessages] = useState([])
-  const [selectedChatId, setSelectedChatId] = useState('')
+  const [selectedChatId, setSelectedChatId] = useState(() => {
+    if (initialMonitoredMeta.data[0]?.jid) return initialMonitoredMeta.data[0].jid
+    if (initialAllMeta.data[0]?.jid) return initialAllMeta.data[0].jid
+    return ''
+  })
   const [selectedJids, setSelectedJids] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [chatFilter, setChatFilter] = useState('all')
-  const [loadingChats, setLoadingChats] = useState(true)
+  const [chatFilter, setChatFilter] = useState('monitored')
+  chatFilterRef.current = chatFilter
+  const [filterLoading, setFilterLoading] = useState({ all: false, monitored: false })
+  const [loadingChats, setLoadingChats] = useState(() => (
+    initialAllMeta.data.length === 0 && initialMonitoredMeta.data.length === 0
+  ))
   const [loadingMessages, setLoadingMessages] = useState(false)
-  const [chatPage, setChatPage] = useState(1)
-  const [hasMoreChats, setHasMoreChats] = useState(true)
+  const [allChatPage, setAllChatPage] = useState(initialAllMeta.page || 1)
+  const [monitoredChatPage, setMonitoredChatPage] = useState(initialMonitoredMeta.page || 1)
+  const [allChatsTotal, setAllChatsTotal] = useState(initialAllMeta.total || 0)
+  const [monitoredChatsTotal, setMonitoredChatsTotal] = useState(initialMonitoredMeta.total || 0)
+  const [hasMoreAllChats, setHasMoreAllChats] = useState(initialAllMeta.hasMore !== false)
+  const [hasMoreMonitoredChats, setHasMoreMonitoredChats] = useState(initialMonitoredMeta.hasMore !== false)
   const [loadingMoreChats, setLoadingMoreChats] = useState(false)
   const [monitoringIds, setMonitoringIds] = useState([])
   const [deletingJids, setDeletingJids] = useState([])
@@ -414,15 +437,50 @@ const ScrapedChats = ({ setToast }) => {
     setChatContextMenu({ isOpen: false, x: 0, y: 0, targetMessage: null })
   }
 
-  const selectedChat = useMemo(
-    () => chats.find(chat => chat.jid === selectedChatId) || null,
-    [chats, selectedChatId]
+  const mapPageChats = useCallback((chats, { forceMonitored = false } = {}) => (
+    chats.map(chat => ({
+      ...normalizeChat(chat),
+      isMonitored: forceMonitored || Boolean(chat.isMonitored ?? chat.is_monitored),
+    })).filter(chat => chat.jid)
+  ), [])
+
+  const fetchChatsPage = useCallback(async ({ type, page = 1, search = '' } = {}) => {
+    const response = await scrapedChatsApi.getChats({
+      type,
+      page,
+      pageSize: CHATS_PAGE_SIZE,
+      search: search.trim() || undefined,
+    })
+    const pageData = scrapedChatsApi.parseChatsPage(response)
+    const forceMonitored = type === 'monitored'
+    return {
+      chats: mapPageChats(pageData.chats, { forceMonitored }),
+      total: pageData.total,
+      page: pageData.page,
+      hasMore: pageData.hasMore,
+    }
+  }, [mapPageChats])
+
+  const mergeUniqueChats = useCallback((prevChats, nextChats) => {
+    const existingJids = new Set(prevChats.map(chat => chat.jid))
+    const uniqueNext = nextChats.filter(chat => !existingJids.has(chat.jid))
+    return [...prevChats, ...uniqueNext]
+  }, [])
+
+  const monitoredJidSet = useMemo(
+    () => new Set(monitoredChats.map(chat => chat.jid)),
+    [monitoredChats]
   )
 
-  const monitoredCount = useMemo(
-    () => chats.filter(chat => chat.isMonitored).length,
-    [chats]
-  )
+  const selectedChat = useMemo(() => {
+    const fromMonitored = monitoredChats.find(chat => chat.jid === selectedChatId)
+    if (fromMonitored) return fromMonitored
+    const fromAll = allChats.find(chat => chat.jid === selectedChatId)
+    if (!fromAll) return null
+    return { ...fromAll, isMonitored: monitoredJidSet.has(fromAll.jid) }
+  }, [allChats, monitoredChats, monitoredJidSet, selectedChatId])
+
+  const monitoredCount = monitoredChats.length
 
   const selectedJidSet = useMemo(
     () => new Set(selectedJids),
@@ -435,19 +493,13 @@ const ScrapedChats = ({ setToast }) => {
   )
 
   const visibleChats = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase()
-    let baseList = chatFilter === 'monitored'
-      ? chats.filter(chat => chat.isMonitored)
-      : chats
+    const baseList = chatFilter === 'monitored'
+      ? monitoredChats
+      : allChats.map(chat => ({
+        ...chat,
+        isMonitored: monitoredJidSet.has(chat.jid),
+      }))
 
-    if (term) {
-      baseList = baseList.filter(chat => (
-        chat.name.toLowerCase().includes(term)
-        || chat.jid.toLowerCase().includes(term)
-      ))
-    }
-
-    // Pinned chats stay on top like WhatsApp Web
     return [...baseList].sort((a, b) => {
       const aPinned = pinnedJids.includes(a.jid)
       const bPinned = pinnedJids.includes(b.jid)
@@ -455,16 +507,19 @@ const ScrapedChats = ({ setToast }) => {
       if (!aPinned && bPinned) return 1
       return 0
     })
-  }, [chatFilter, chats, searchTerm, pinnedJids])
+  }, [allChats, chatFilter, monitoredChats, monitoredJidSet, pinnedJids])
+
+  const activeChatsTotal = chatFilter === 'monitored' ? monitoredChatsTotal : allChatsTotal
+  const hasMoreActiveChats = chatFilter === 'monitored' ? hasMoreMonitoredChats : hasMoreAllChats
 
   const selectedUnmonitoredJids = useMemo(
-    () => selectedJids.filter(id => chats.some(chat => chat.jid === id && !chat.isMonitored)),
-    [selectedJids, chats]
+    () => selectedJids.filter(id => allChats.some(chat => chat.jid === id) && !monitoredJidSet.has(id)),
+    [allChats, monitoredJidSet, selectedJids]
   )
 
   const selectedMonitoredJids = useMemo(
-    () => selectedJids.filter(id => chats.some(chat => chat.jid === id && chat.isMonitored)),
-    [selectedJids, chats]
+    () => selectedJids.filter(id => monitoredJidSet.has(id)),
+    [monitoredJidSet, selectedJids]
   )
 
   const allVisibleSelected = visibleChats.length > 0
@@ -480,94 +535,295 @@ const ScrapedChats = ({ setToast }) => {
     ))
   }, [messages, messageSearchQuery])
 
-  const loadChats = useCallback(async () => {
-    setLoadingChats(true)
-    setError('')
-    setChatPage(1)
-    setHasMoreChats(true)
+  const updateMonitorState = useCallback((jids, isMonitored) => {
+    const jidSet = new Set(jids)
 
-    const [allChatsResult, monitoredResult] = await Promise.allSettled([
-      scrapedChatsApi.getChats({ type: 'chats', page: 1, pageSize: 50 }),
-      scrapedChatsApi.getMonitoredChats(),
-    ])
-
-    const rawAllChats = allChatsResult.status === 'fulfilled'
-      ? extractList(allChatsResult.value)
-      : []
-    const allChats = rawAllChats.map(normalizeChat).filter(chat => chat.jid)
-
-    if (rawAllChats.length < 50) {
-      setHasMoreChats(false)
-    }
-
-    const monitoredChats = monitoredResult.status === 'fulfilled'
-      ? extractList(monitoredResult.value).map(normalizeChat).filter(chat => chat.jid)
-      : []
-
-    const monitoredIds = new Set(monitoredChats.map(chat => chat.jid))
-    const knownIds = new Set(allChats.map(chat => chat.jid))
-
-    const mergedChats = [
-      ...allChats.map(chat => ({
-        ...chat,
-        isMonitored: chat.isMonitored || monitoredIds.has(chat.jid),
-      })),
-      ...monitoredChats
-        .filter(chat => !knownIds.has(chat.jid))
-        .map(chat => ({ ...chat, isMonitored: true })),
-    ]
-
-    setChats(mergedChats)
-    setLastSyncedAt(new Date().toISOString())
-    setSelectedJids(prev => prev.filter(id => mergedChats.some(chat => chat.jid === id)))
-
-    if (allChatsResult.status === 'rejected' && monitoredResult.status === 'rejected') {
-      setError(allChatsResult.reason?.message || 'Failed to load scraped chats')
-    }
-
-    setSelectedChatId(prev => {
-      if (prev && mergedChats.some(chat => chat.jid === prev)) return prev
-      return mergedChats[0]?.jid || ''
-    })
-
-    setLoadingChats(false)
-  }, [])
-
-  // 📜 Infinite Scroll: Load Next 50 Chats when user scrolls to bottom
-  const loadMoreChats = useCallback(async () => {
-    if (loadingMoreChats || loadingChats || !hasMoreChats) return
-
-    setLoadingMoreChats(true)
-    const nextPage = chatPage + 1
-
-    try {
-      const response = await scrapedChatsApi.getChats({
-        type: 'chats',
-        page: nextPage,
-        pageSize: 50,
+    if (isMonitored) {
+      setMonitoredChats(prev => {
+        const existing = new Map(prev.map(chat => [chat.jid, chat]))
+        allChats.forEach(chat => {
+          if (jidSet.has(chat.jid)) {
+            existing.set(chat.jid, { ...chat, isMonitored: true })
+          }
+        })
+        return Array.from(existing.values())
       })
+      return
+    }
 
-      const rawNewChats = extractList(response)
-      const newChats = rawNewChats.map(normalizeChat).filter(chat => chat.jid)
+    setMonitoredChats(prev => prev.filter(chat => !jidSet.has(chat.jid)))
+  }, [allChats])
 
-      if (rawNewChats.length < 50 || newChats.length === 0) {
-        setHasMoreChats(false)
+  const removeChatsByJids = useCallback((jids) => {
+    const jidSet = new Set(jids)
+    setAllChats(prev => {
+      const next = prev.filter(chat => !jidSet.has(chat.jid))
+      scrapedChatsApi.setCachedAllChats(next, undefined, {
+        total: Math.max(allChatsTotal - jids.length, next.length),
+        page: allChatPage,
+        search: appliedSearchRef.current,
+        hasMore: hasMoreAllChats,
+      })
+      return next
+    })
+    setMonitoredChats(prev => {
+      const next = prev.filter(chat => !jidSet.has(chat.jid))
+      scrapedChatsApi.setCachedMonitoredChats(next, undefined, {
+        total: Math.max(monitoredChatsTotal - jids.length, next.length),
+        page: monitoredChatPage,
+        search: appliedSearchRef.current,
+        hasMore: hasMoreMonitoredChats,
+      })
+      return next
+    })
+    setAllChatsTotal(prev => Math.max(prev - jids.length, 0))
+    setMonitoredChatsTotal(prev => Math.max(prev - jids.length, 0))
+  }, [allChatPage, allChatsTotal, hasMoreAllChats, hasMoreMonitoredChats, monitoredChatPage, monitoredChatsTotal])
+
+  const refreshAllChats = useCallback(async ({
+    page = 1,
+    search = appliedSearchRef.current,
+    append = false,
+  } = {}) => {
+    if (allRefreshRef.current && page === 1 && !append) return allRefreshRef.current
+
+    const job = (async () => {
+      if (page === 1 && !append) {
+        setFilterLoading(prev => ({ ...prev, all: true }))
       }
 
-      if (newChats.length > 0) {
-        setChats(prevChats => {
-          const existingJids = new Set(prevChats.map(c => c.jid))
-          const uniqueNewChats = newChats.filter(c => !existingJids.has(c.jid))
-          return [...prevChats, ...uniqueNewChats]
+      try {
+        let pageResult = null
+
+        if (page === 1 && !append && !search) {
+          try {
+            const cached = await scrapedChatsApi.consumePrefetchedAllChats()
+            if (cached?.data?.length) {
+              pageResult = {
+                chats: mapPageChats(cached.data),
+                total: cached.total,
+                page: cached.page,
+                hasMore: cached.hasMore,
+              }
+            }
+          } catch {
+            pageResult = null
+          }
+        }
+
+        if (!pageResult) {
+          pageResult = await fetchChatsPage({ type: 'all', page, search })
+        }
+
+        const nextChats = append
+          ? mergeUniqueChats(allChats, pageResult.chats)
+          : pageResult.chats
+
+        scrapedChatsApi.setCachedAllChats(nextChats, undefined, {
+          total: pageResult.total,
+          page: pageResult.page,
+          search,
+          hasMore: pageResult.hasMore,
         })
-        setChatPage(nextPage)
+        setAllChats(nextChats)
+        setAllChatPage(pageResult.page)
+        setAllChatsTotal(pageResult.total)
+        setHasMoreAllChats(pageResult.hasMore)
+        setLastSyncedAt(new Date().toISOString())
+        setError('')
+      } catch (err) {
+        if (allChats.length === 0 && monitoredChats.length === 0) {
+          setError(err.message || 'Failed to load scraped chats')
+        }
+      } finally {
+        if (page === 1 && !append) {
+          setFilterLoading(prev => ({ ...prev, all: false }))
+          allRefreshRef.current = null
+        }
+      }
+    })()
+
+    if (page === 1 && !append) {
+      allRefreshRef.current = job
+    }
+    return job
+  }, [allChats, fetchChatsPage, mapPageChats, mergeUniqueChats, monitoredChats.length])
+
+  const refreshMonitoredChats = useCallback(async ({
+    page = 1,
+    search = appliedSearchRef.current,
+    append = false,
+  } = {}) => {
+    if (monitoredRefreshRef.current && page === 1 && !append) return monitoredRefreshRef.current
+
+    const job = (async () => {
+      if (page === 1 && !append) {
+        setFilterLoading(prev => ({ ...prev, monitored: true }))
+      }
+
+      try {
+        let pageResult = null
+
+        if (page === 1 && !append && !search) {
+          try {
+            const cached = await scrapedChatsApi.consumePrefetchedMonitored()
+            if (cached?.data?.length) {
+              pageResult = {
+                chats: mapPageChats(cached.data, { forceMonitored: true }),
+                total: cached.total,
+                page: cached.page,
+                hasMore: cached.hasMore,
+              }
+            }
+          } catch {
+            pageResult = null
+          }
+        }
+
+        if (!pageResult) {
+          pageResult = await fetchChatsPage({ type: 'monitored', page, search })
+        }
+
+        const nextChats = append
+          ? mergeUniqueChats(monitoredChats, pageResult.chats)
+          : pageResult.chats
+
+        scrapedChatsApi.setCachedMonitoredChats(nextChats, undefined, {
+          total: pageResult.total,
+          page: pageResult.page,
+          search,
+          hasMore: pageResult.hasMore,
+        })
+        setMonitoredChats(nextChats)
+        setMonitoredChatPage(pageResult.page)
+        setMonitoredChatsTotal(pageResult.total)
+        setHasMoreMonitoredChats(pageResult.hasMore)
+        setLastSyncedAt(new Date().toISOString())
+        setError('')
+      } catch (err) {
+        if (allChats.length === 0 && monitoredChats.length === 0) {
+          setError(err.message || 'Failed to load monitored chats')
+        }
+      } finally {
+        if (page === 1 && !append) {
+          setFilterLoading(prev => ({ ...prev, monitored: false }))
+          monitoredRefreshRef.current = null
+        }
+      }
+    })()
+
+    if (page === 1 && !append) {
+      monitoredRefreshRef.current = job
+    }
+    return job
+  }, [allChats.length, fetchChatsPage, mapPageChats, mergeUniqueChats, monitoredChats])
+
+  const refreshChats = useCallback(async () => {
+    setLoadingChats(true)
+    setError('')
+
+    try {
+      await Promise.allSettled([
+        refreshAllChats({ page: 1, search: appliedSearchRef.current, append: false }),
+        refreshMonitoredChats({ page: 1, search: appliedSearchRef.current, append: false }),
+      ])
+    } finally {
+      setLoadingChats(false)
+    }
+  }, [refreshAllChats, refreshMonitoredChats])
+
+  const handleFilterChange = useCallback((nextFilter) => {
+    if (nextFilter === chatFilterRef.current) return
+    setChatFilter(nextFilter)
+
+    if (nextFilter === 'monitored') {
+      void refreshMonitoredChats({
+        page: 1,
+        search: appliedSearchRef.current,
+        append: false,
+      })
+      return
+    }
+
+    void refreshAllChats({
+      page: 1,
+      search: appliedSearchRef.current,
+      append: false,
+    })
+  }, [refreshAllChats, refreshMonitoredChats])
+
+  const refreshAllChatsRef = useRef(refreshAllChats)
+  const refreshMonitoredChatsRef = useRef(refreshMonitoredChats)
+  const refreshChatsRef = useRef(refreshChats)
+  refreshAllChatsRef.current = refreshAllChats
+  refreshMonitoredChatsRef.current = refreshMonitoredChats
+  refreshChatsRef.current = refreshChats
+
+  // 📜 Infinite Scroll: append next page when user scrolls to bottom
+  const loadMoreChats = useCallback(async () => {
+    if (loadingMoreChats || loadingChats || !hasMoreActiveChats) return
+
+    setLoadingMoreChats(true)
+
+    try {
+      if (chatFilter === 'monitored') {
+        const nextPage = monitoredChatPage + 1
+        const pageResult = await fetchChatsPage({
+          type: 'monitored',
+          page: nextPage,
+          search: appliedSearchRef.current,
+        })
+
+        setMonitoredChats(prev => {
+          const next = mergeUniqueChats(prev, pageResult.chats)
+          scrapedChatsApi.setCachedMonitoredChats(next, undefined, {
+            total: pageResult.total,
+            page: pageResult.page,
+            search: appliedSearchRef.current,
+            hasMore: pageResult.hasMore,
+          })
+          return next
+        })
+        setMonitoredChatPage(pageResult.page)
+        setMonitoredChatsTotal(pageResult.total)
+        setHasMoreMonitoredChats(pageResult.hasMore)
+      } else {
+        const nextPage = allChatPage + 1
+        const pageResult = await fetchChatsPage({
+          type: 'all',
+          page: nextPage,
+          search: appliedSearchRef.current,
+        })
+
+        setAllChats(prev => {
+          const next = mergeUniqueChats(prev, pageResult.chats)
+          scrapedChatsApi.setCachedAllChats(next, undefined, {
+            total: pageResult.total,
+            page: pageResult.page,
+            search: appliedSearchRef.current,
+            hasMore: pageResult.hasMore,
+          })
+          return next
+        })
+        setAllChatPage(pageResult.page)
+        setAllChatsTotal(pageResult.total)
+        setHasMoreAllChats(pageResult.hasMore)
       }
     } catch (err) {
       console.warn('Failed to load more chats on scroll:', err.message)
     } finally {
       setLoadingMoreChats(false)
     }
-  }, [chatPage, hasMoreChats, loadingChats, loadingMoreChats])
+  }, [
+    allChatPage,
+    chatFilter,
+    fetchChatsPage,
+    hasMoreActiveChats,
+    loadingChats,
+    loadingMoreChats,
+    mergeUniqueChats,
+    monitoredChatPage,
+  ])
 
   // Scroll listener for chat list container
   const handleChatListScroll = useCallback((e) => {
@@ -612,8 +868,59 @@ const ScrapedChats = ({ setToast }) => {
 
 
   useEffect(() => {
-    loadChats()
-  }, [loadChats])
+    const hasCache = allChats.length > 0 || monitoredChats.length > 0
+    if (!hasCache) {
+      setLoadingChats(true)
+    }
+
+    let cancelled = false
+    Promise.allSettled([
+      refreshAllChatsRef.current({ page: 1, search: '', append: false }),
+      refreshMonitoredChatsRef.current({ page: 1, search: '', append: false }),
+      scrapedChatsApi.getChatStats(),
+    ]).then((results) => {
+      const statsResult = results[2]
+      if (statsResult?.status === 'fulfilled') {
+        const stats = statsResult.value?.data || statsResult.value
+        if (stats?.total != null) setAllChatsTotal(Number(stats.total))
+        if (stats?.monitored != null) setMonitoredChatsTotal(Number(stats.monitored))
+      }
+    }).finally(() => {
+      if (!cancelled) setLoadingChats(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+
+    searchDebounceRef.current = setTimeout(() => {
+      const nextSearch = searchTerm.trim()
+      if (nextSearch === appliedSearchRef.current) return
+      appliedSearchRef.current = nextSearch
+
+      if (chatFilterRef.current === 'monitored') {
+        void refreshMonitoredChatsRef.current({
+          page: 1,
+          search: nextSearch,
+          append: false,
+        })
+      } else {
+        void refreshAllChatsRef.current({
+          page: 1,
+          search: nextSearch,
+          append: false,
+        })
+      }
+    }, 400)
+
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    }
+  }, [searchTerm])
 
   useEffect(() => {
     loadMessages(selectedChatId)
@@ -819,7 +1126,7 @@ const ScrapedChats = ({ setToast }) => {
       await scrapedChatsApi.monitorChats(selectedUnmonitoredJids)
       setToast?.({ type: 'success', message: `${selectedUnmonitoredJids.length} chat${selectedUnmonitoredJids.length > 1 ? 's' : ''} added to monitored chats` })
       setSelectedJids(prev => prev.filter(id => !selectedUnmonitoredJids.includes(id)))
-      await loadChats()
+      void refreshMonitoredChats()
     } catch (err) {
       setToast?.({ type: 'error', message: err.message || 'Failed to monitor selected chats' })
     } finally {
@@ -834,17 +1141,15 @@ const ScrapedChats = ({ setToast }) => {
     setMonitoringIds(prev => Array.from(new Set([...prev, ...jidsToUnmonitor])))
 
     // Optimistic update
-    setChats(prev => prev.map(chat => (
-      jidsToUnmonitor.includes(chat.jid) ? { ...chat, isMonitored: false } : chat
-    )))
+    updateMonitorState(jidsToUnmonitor, false)
 
     try {
       await scrapedChatsApi.unmonitorChats(jidsToUnmonitor)
       setToast?.({ type: 'success', message: `${jidsToUnmonitor.length} chat${jidsToUnmonitor.length > 1 ? 's' : ''} unmonitored successfully` })
       setSelectedJids(prev => prev.filter(id => !jidsToUnmonitor.includes(id)))
-      await loadChats()
+      void refreshMonitoredChats()
     } catch (err) {
-      await loadChats()
+      void refreshMonitoredChats()
       setToast?.({ type: 'error', message: err.message || 'Failed to unmonitor selected chats' })
     } finally {
       setMonitoringIds(prev => prev.filter(id => !jidsToUnmonitor.includes(id)))
@@ -884,11 +1189,11 @@ const ScrapedChats = ({ setToast }) => {
         message: `${jids.length} chat${jids.length > 1 ? 's' : ''} deleted successfully`,
       })
 
-      setChats(prev => prev.filter(c => !jids.includes(c.jid)))
+      removeChatsByJids(jids)
       setSelectedJids(prev => prev.filter(id => !jids.includes(id)))
 
       if (jids.includes(selectedChatId)) {
-        const remaining = chats.filter(c => !jids.includes(c.jid))
+        const remaining = visibleChats.filter(c => !jids.includes(c.jid))
         setSelectedChatId(remaining[0]?.jid || '')
         setIsSelectionMode(false)
         setSelectedMessageIds([])
@@ -896,7 +1201,7 @@ const ScrapedChats = ({ setToast }) => {
       }
 
       closeConfirmModal()
-      await loadChats()
+      void refreshChats()
     } catch (err) {
       setToast?.({ type: 'error', message: err.message || 'Failed to delete selected chats' })
       setConfirmModal(prev => ({ ...prev, isLoading: false }))
@@ -991,25 +1296,25 @@ const ScrapedChats = ({ setToast }) => {
     setMonitoringIds(prev => Array.from(new Set([...prev, jid])))
 
     if (chat.isMonitored) {
-      setChats(prev => prev.map(c => c.jid === jid ? { ...c, isMonitored: false } : c))
+      updateMonitorState([jid], false)
       try {
         await scrapedChatsApi.unmonitorChats([jid])
         setToast?.({ type: 'success', message: `"${chat.name}" unmonitored` })
-        await loadChats()
+        void refreshMonitoredChats()
       } catch (err) {
-        await loadChats()
+        void refreshMonitoredChats()
         setToast?.({ type: 'error', message: err.message || 'Failed to unmonitor chat' })
       } finally {
         setMonitoringIds(prev => prev.filter(id => id !== jid))
       }
     } else {
-      setChats(prev => prev.map(c => c.jid === jid ? { ...c, isMonitored: true } : c))
+      updateMonitorState([jid], true)
       try {
         await scrapedChatsApi.monitorChats([jid])
         setToast?.({ type: 'success', message: `"${chat.name}" added to monitored chats` })
-        await loadChats()
+        void refreshMonitoredChats()
       } catch (err) {
-        await loadChats()
+        void refreshMonitoredChats()
         setToast?.({ type: 'error', message: err.message || 'Failed to monitor chat' })
       } finally {
         setMonitoringIds(prev => prev.filter(id => id !== jid))
@@ -1143,7 +1448,7 @@ const ScrapedChats = ({ setToast }) => {
 
           <button
             type="button"
-            onClick={loadChats}
+            onClick={refreshChats}
             disabled={loadingChats}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-700 text-white text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-600 disabled:opacity-60 transition-colors cursor-pointer"
           >
@@ -1156,8 +1461,8 @@ const ScrapedChats = ({ setToast }) => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <StatBox label="Total chats" value={chats.length} sub="From scraped chats API" />
-        <StatBox label="Monitored" value={monitoredCount} sub="Tracked by monitor API" />
+        <StatBox label="Total chats" value={allChatsTotal || allChats.length} sub="Paginated from scraped chats API" />
+        <StatBox label="Monitored" value={monitoredChatsTotal || monitoredCount} sub="Tracked by monitor API" />
         <StatBox label="Messages" value={messages.length} sub={selectedChat?.name || 'Select a chat'} />
         <StatBox label="Last sync" value={lastSyncedAt ? formatDateTime(lastSyncedAt) : 'Pending'} sub="Dashboard refresh time" />
       </div>
@@ -1175,7 +1480,12 @@ const ScrapedChats = ({ setToast }) => {
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-black text-slate-900 dark:text-slate-100">Chats</h2>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{visibleChats.length} visible · {selectedJids.length} selected</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                {visibleChats.length} loaded
+                {activeChatsTotal > 0 ? ` of ${activeChatsTotal}` : ''}
+                {' · '}
+                {selectedJids.length} selected
+              </p>
             </div>
             <div className="bg-slate-100 dark:bg-slate-900/70 rounded-xl p-1 flex">
               {[
@@ -1185,13 +1495,16 @@ const ScrapedChats = ({ setToast }) => {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setChatFilter(item.id)}
+                  onClick={() => handleFilterChange(item.id)}
                   className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${chatFilter === item.id
                       ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-sm'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                     }`}
                 >
                   {item.label}
+                  {filterLoading[item.id] && (
+                    <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse align-middle" />
+                  )}
                 </button>
               ))}
             </div>
@@ -1209,7 +1522,7 @@ const ScrapedChats = ({ setToast }) => {
                 type="text"
                 value={searchTerm}
                 onChange={event => setSearchTerm(event.target.value)}
-                placeholder="Search chats..."
+                placeholder="Search chats (server)..."
                 className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
               />
             </div>
@@ -1235,12 +1548,12 @@ const ScrapedChats = ({ setToast }) => {
               {allVisibleSelected ? 'Unselect visible' : 'Select visible'}
             </button>
             <p className="text-[11px] text-slate-400 dark:text-slate-500">
-              {visibleChats.length} visible chats
+              {visibleChats.length} loaded{activeChatsTotal > 0 ? ` of ${activeChatsTotal}` : ''} chats
             </p>
           </div>
 
           <div ref={chatListContainerRef} onScroll={handleChatListScroll} className="flex-1 overflow-y-auto">
-            {loadingChats ? (
+            {loadingChats && allChats.length === 0 && monitoredChats.length === 0 ? (
               <div className="p-4 space-y-3 animate-pulse">
                 {[1, 2, 3].map(item => (
                   <div key={item} className="flex items-center gap-3">
@@ -1440,9 +1753,11 @@ const ScrapedChats = ({ setToast }) => {
                   </div>
                 )}
 
-                {!hasMoreChats && visibleChats.length > 0 && (
+                {!hasMoreActiveChats && visibleChats.length > 0 && (
                   <div className="py-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700/40">
-                    All {visibleChats.length} chats loaded
+                    {activeChatsTotal > 0
+                      ? `All ${activeChatsTotal} matching chats loaded`
+                      : `All ${visibleChats.length} chats loaded`}
                   </div>
                 )}
               </div>
