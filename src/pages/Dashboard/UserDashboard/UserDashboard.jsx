@@ -113,48 +113,39 @@ const FirstLoginPasswordModal = ({ onChangePassword, onDismiss }) => (
   </div>
 )
 
-const WhatsAppRequiredModal = ({ onConnect, onDismiss }) => (
+const WhatsAppDisconnectedBanner = ({ onConnect, onDismiss }) => (
   <div
-    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="whatsapp-required-title"
-    aria-describedby="whatsapp-required-description"
+    className="mb-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+    role="status"
   >
-    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:p-7">
-      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
-        <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-        </svg>
-      </div>
-
-      <h2 id="whatsapp-required-title" className="text-xl font-black text-slate-900 dark:text-white">
-        Scan QR Code to Search Properties
-      </h2>
-      <p id="whatsapp-required-description" className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-        Your WhatsApp is not connected. Link your WhatsApp account by scanning the QR code to start searching property listings from scraped chats.
-      </p>
-
-      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-        >
-          Later
-        </button>
-        <button
-          type="button"
-          onClick={onConnect}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-600"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-          </svg>
-          Scan QR Code
-        </button>
-      </div>
+    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+      </svg>
     </div>
+    <div className="min-w-0 flex-1">
+      <p className="text-sm font-black">WhatsApp disconnected</p>
+      <p className="mt-0.5 text-xs leading-5 text-amber-800 dark:text-amber-300">
+        Search still works on already scraped listings. Scan QR to resume live scraping.
+      </p>
+      <button
+        type="button"
+        onClick={onConnect}
+        className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-600"
+      >
+        Scan QR Code
+      </button>
+    </div>
+    <button
+      type="button"
+      onClick={onDismiss}
+      className="shrink-0 rounded-lg p-1.5 text-amber-700 transition hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/50"
+      aria-label="Close WhatsApp banner"
+    >
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
   </div>
 )
 
@@ -166,7 +157,7 @@ const UserDashboard = ({ user, onUserUpdate, onSignOut, setToast, theme, setThem
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showFirstLoginPrompt, setShowFirstLoginPrompt] = useState(() => isFirstLoginUser(user))
   const [whatsappConnected, setWhatsappConnected] = useState(user?.whatsappConnected ?? null)
-  const [showWhatsappModal, setShowWhatsappModal] = useState(false)
+  const [whatsappBannerDismissed, setWhatsappBannerDismissed] = useState(false)
   const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem('property_search_filters')
     if (saved) {
@@ -256,19 +247,14 @@ const UserDashboard = ({ user, onUserUpdate, onSignOut, setToast, theme, setThem
   }, [user?.id, user?.role, subInfo.isExpired, onUserUpdate])
 
   useEffect(() => {
-    if (whatsappConnected === false && activeTab === 'search' && !subInfo.isExpired) {
-      setShowWhatsappModal(true)
-    }
-
     if (whatsappConnected) {
-      setShowWhatsappModal(false)
+      setWhatsappBannerDismissed(false)
     }
-  }, [activeTab, whatsappConnected, subInfo.isExpired])
+  }, [whatsappConnected])
 
   const openWhatsappConnect = () => {
     setActiveTab('connect')
     setSidebarOpen(false)
-    setShowWhatsappModal(false)
   }
 
   const openPasswordReset = () => {
@@ -287,12 +273,14 @@ const UserDashboard = ({ user, onUserUpdate, onSignOut, setToast, theme, setThem
   }
 
   const handleSearch = (appliedFilters) => {
-    if (whatsappConnected === false) {
-      setShowWhatsappModal(true)
-      return
-    }
     navigate('/results', { state: { filters: appliedFilters } })
   }
+
+  const showWhatsappBanner =
+    whatsappConnected === false &&
+    !whatsappBannerDismissed &&
+    !subInfo.isExpired &&
+    (activeTab === 'search' || activeTab === 'scrapedChats')
 
   return (
     <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 overflow-hidden transition-colors">
@@ -317,6 +305,12 @@ const UserDashboard = ({ user, onUserUpdate, onSignOut, setToast, theme, setThem
         <main className="flex-1 overflow-y-auto">
           {activeTab === 'search' && (
             <div className="mx-auto w-full max-w-[1600px] p-4 sm:p-6">
+              {showWhatsappBanner && (
+                <WhatsAppDisconnectedBanner
+                  onConnect={openWhatsappConnect}
+                  onDismiss={() => setWhatsappBannerDismissed(true)}
+                />
+              )}
               <PropertyFilters
                 filters={filters}
                 setFilters={setFilters}
@@ -336,7 +330,19 @@ const UserDashboard = ({ user, onUserUpdate, onSignOut, setToast, theme, setThem
           {activeTab === 'scrapedChats' && (
             subInfo.isExpired
               ? <ExpiredSubscriptionOverlay user={user} subInfo={subInfo} />
-              : <ScrapedChats setToast={setToast} />
+              : (
+                <>
+                  {showWhatsappBanner && (
+                    <div className="px-4 pt-4 sm:px-6">
+                      <WhatsAppDisconnectedBanner
+                        onConnect={openWhatsappConnect}
+                        onDismiss={() => setWhatsappBannerDismissed(true)}
+                      />
+                    </div>
+                  )}
+                  <ScrapedChats setToast={setToast} />
+                </>
+              )
           )}
           {activeTab === 'resetPassword' && (
             <ResetPassword
@@ -360,12 +366,6 @@ const UserDashboard = ({ user, onUserUpdate, onSignOut, setToast, theme, setThem
         <FirstLoginPasswordModal
           onChangePassword={openPasswordReset}
           onDismiss={() => setShowFirstLoginPrompt(false)}
-        />
-      )}
-      {showWhatsappModal && (
-        <WhatsAppRequiredModal
-          onConnect={openWhatsappConnect}
-          onDismiss={() => setShowWhatsappModal(false)}
         />
       )}
     </div>
