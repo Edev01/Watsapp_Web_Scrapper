@@ -1,4 +1,6 @@
-const BASE_URL = import.meta.env.VITE_SCRAPPER_URL || 'https://scrapper-node-app.onrender.com';
+const BASE_URL = (
+  import.meta.env.VITE_SCRAPPER_URL || 'https://watsapp-web-backend.onrender.com'
+).replace(/\/$/, '');
 
 export const API_ENDPOINTS = {
   adminSignup: `${BASE_URL}/api/auth/admin/signup`,
