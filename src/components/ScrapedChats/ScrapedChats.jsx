@@ -309,6 +309,7 @@ const ScrapedChats = ({ setToast }) => {
   const [monitoredChatPage, setMonitoredChatPage] = useState(initialMonitoredMeta.page || 1)
   const [allChatsTotal, setAllChatsTotal] = useState(initialAllMeta.total || 0)
   const [monitoredChatsTotal, setMonitoredChatsTotal] = useState(initialMonitoredMeta.total || 0)
+  const [totalMessagesCount, setTotalMessagesCount] = useState(0)
   const [hasMoreAllChats, setHasMoreAllChats] = useState(initialAllMeta.hasMore !== false)
   const [hasMoreMonitoredChats, setHasMoreMonitoredChats] = useState(initialMonitoredMeta.hasMore !== false)
   const [loadingMoreChats, setLoadingMoreChats] = useState(false)
@@ -884,6 +885,7 @@ const ScrapedChats = ({ setToast }) => {
         const stats = statsResult.value?.data || statsResult.value
         if (stats?.total != null) setAllChatsTotal(Number(stats.total))
         if (stats?.monitored != null) setMonitoredChatsTotal(Number(stats.monitored))
+        if (stats?.messages != null) setTotalMessagesCount(Number(stats.messages))
       }
     }).finally(() => {
       if (!cancelled) setLoadingChats(false)
@@ -1463,7 +1465,7 @@ const ScrapedChats = ({ setToast }) => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatBox label="Total chats" value={allChatsTotal || allChats.length} sub="Paginated from scraped chats API" />
         <StatBox label="Monitored" value={monitoredChatsTotal || monitoredCount} sub="Tracked by monitor API" />
-        <StatBox label="Messages" value={messages.length} sub={selectedChat?.name || 'Select a chat'} />
+        <StatBox label="Messages" value={totalMessagesCount} sub="Total scraped messages" />
         <StatBox label="Last sync" value={lastSyncedAt ? formatDateTime(lastSyncedAt) : 'Pending'} sub="Dashboard refresh time" />
       </div>
 
