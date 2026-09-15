@@ -1,12 +1,8 @@
 {
-  "routes": [
+  "rewrites": [
     {
-      "src": "/ml-api/(.*)",
-      "dest": "https://presently-gonna-interpretation-retrieval.trycloudflare.com/$1"
-    },
-    {
-      "src": "/[^.]*",
-      "dest": "/index.html"
+      "source": "/ml-api/:path*",
+      "destination": "http://194.233.90.150:3000/:path*"
     }
   ]
 }
