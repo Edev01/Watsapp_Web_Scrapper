@@ -1,10 +1,6 @@
 {
   "routes": [
     {
-      "src": "/ml-api/(.*)",
-      "dest": "http://16.16.126.44:8000/$1"
-    },
-    {
       "src": "/[^.]*",
       "dest": "/index.html"
     }

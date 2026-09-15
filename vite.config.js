@@ -8,13 +8,4 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  server: {
-    proxy: {
-      '/ml-api': {
-        target: 'http://16.16.126.44:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ml-api/, ''),
-      },
-    },
-  },
 })

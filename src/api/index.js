@@ -650,83 +650,21 @@ export const propertyApi = {
   },
 };
 
-// ML WhatsApp AI Search Backend
-const ML_API_PROXY_PREFIX = '/ml-api'
-const ML_SEARCH_PATH = '/api/dashboard-search'
-const CORS_PROXIED_ML_HOSTS = new Set(['16.16.126.44:8000', '13.48.129.228:8000'])
-
-const addMlSearchPath = (url) => {
-  const cleanUrl = url.replace(/\/$/, '')
-  return cleanUrl.endsWith(ML_SEARCH_PATH) ? cleanUrl : `${cleanUrl}${ML_SEARCH_PATH}`
-}
-
-const toCorsSafeMlUrl = (url) => {
-  const configuredUrl = (url || '').trim() || ML_API_PROXY_PREFIX
-  const fullUrl = addMlSearchPath(configuredUrl)
-
-  if (fullUrl.startsWith('/')) return fullUrl
-
-  try {
-    const parsed = new URL(fullUrl)
-    if (CORS_PROXIED_ML_HOSTS.has(parsed.host)) {
-      return `${ML_API_PROXY_PREFIX}${parsed.pathname}${parsed.search}`
-    }
-  } catch (err) {
-    console.warn('Invalid VITE_ML_API_URL, falling back to local ML proxy:', err)
-    return addMlSearchPath(ML_API_PROXY_PREFIX)
-  }
-
-  return fullUrl
-}
-
-const ML_SEARCH_URL = toCorsSafeMlUrl(import.meta.env.VITE_ML_API_URL)
-
+// Search goes to Node (`/api/properties/filter`), not the old FastAPI :8000 host.
 export const mlSearchApi = {
-  dashboardSearch: (filters = {}) => {
-    const userId = getLoggedInUserId()
-    const payload = {}
-
-    if (userId) {
-      payload.userId = userId
-      payload.user_id = userId
-    }
-
-    if (filters.purpose && filters.purpose !== 'All') payload.purpose = filters.purpose
-    if (filters.city && filters.city !== 'All Cities') payload.city = filters.city
-    if (filters.status) payload.status = String(filters.status).toUpperCase()
-    
-    // Pass user input to ML AI 'query' field so normalization and typo-tolerance work
+  dashboardSearch: async (filters = {}) => {
     const searchParam = (filters.query || filters.location || '').trim()
-    if (searchParam) {
-      payload.query = searchParam
-    }
-
-    if (filters.propertyType && filters.propertyType !== 'All') payload.propertyType = filters.propertyType
-    if (filters.propertySubType && filters.propertySubType !== 'Any' && filters.propertySubType !== 'Standard') {
-      payload.propertySubType = filters.propertySubType
-    }
-
-    if (filters.priceMin) payload.priceMin = parseFloat(filters.priceMin)
-    if (filters.priceMax) payload.priceMax = parseFloat(filters.priceMax)
-
-    if (filters.areaMin || filters.areaMax) {
-      if (filters.areaUnit && filters.areaUnit !== 'All') payload.areaUnit = filters.areaUnit
-      if (filters.areaMin) payload.areaMin = parseFloat(filters.areaMin)
-      if (filters.areaMax) payload.areaMax = parseFloat(filters.areaMax)
-    }
-    if (filters.sortBy) payload.sortBy = filters.sortBy
-
-    payload.limit = filters.limit || 10000
-
-    return fetch(ML_SEARCH_URL, {
-      method: 'POST',
-      headers: buildHeaders(),
-      body: JSON.stringify(payload),
-    }).then(async (res) => {
-      const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.detail || data?.message || `ML API error: ${res.status}`)
-      return data
+    const res = await propertyApi.filterProperties({
+      ...filters,
+      location: searchParam || filters.location,
     })
+    const properties = res?.data?.properties || res?.properties || []
+    return {
+      success: true,
+      count: properties.length,
+      results: properties,
+      data: { ...res?.data, properties, results: properties },
+    }
   },
 };
 

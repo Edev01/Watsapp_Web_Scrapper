@@ -315,6 +315,7 @@ const parseMLSearchResults = (response) => {
   if (!response) return []
   if (Array.isArray(response.results)) return response.results
   if (Array.isArray(response?.data?.results)) return response.data.results
+  if (Array.isArray(response?.data?.properties)) return response.data.properties
   if (Array.isArray(response.data)) return response.data
   if (Array.isArray(response.properties)) return response.properties
   return []
